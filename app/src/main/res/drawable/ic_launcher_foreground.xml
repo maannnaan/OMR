@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Answer sheet with filled bubbles inside a scan frame -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M38,30h32a4,4 0,0 1,4 4v40a4,4 0,0 1,-4 4h-32a4,4 0,0 1,-4 -4v-40a4,4 0,0 1,4 -4z"/>
+    <path android:fillColor="#FF1C1B19" android:pathData="M45,42m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M54,42m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M63,42m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M45,53m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:fillColor="#FF1C1B19" android:pathData="M54,53m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M63,53m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M45,64m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FF1C1B19" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M54,64m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:fillColor="#FF1C1B19" android:pathData="M63,64m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path android:strokeColor="#FFF97316" android:strokeWidth="3" android:fillColor="#00000000" android:pathData="M26,36v-10h10 M72,26h10v10 M82,72v10h-10 M36,82h-10v-10"/>
+</vector>
