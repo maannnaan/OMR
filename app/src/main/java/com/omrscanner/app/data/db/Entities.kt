@@ -24,6 +24,8 @@ data class ExamEntity(
     /** What two firm marks on one question mean: "wrong" (0 marks) or "review" (teacher decides). */
     val doubleRule: String = "wrong",
     val createdAt: Long = System.currentTimeMillis(),
+    /** The Lecturer.bd question paper this exam was imported from; its results upload there. Null for exams made here. */
+    val remotePaperId: String? = null,
 )
 
 @Entity(tableName = "students", indices = [Index("examId")])
@@ -64,6 +66,8 @@ data class SheetEntity(
     val rotation: Int = 0,
     val imagePath: String? = null,
     val scannedAt: Long = System.currentTimeMillis(),
+    /** When this sheet, as it is now, was sent to Lecturer.bd; null if never, or changed since. */
+    val uploadedAt: Long? = null,
 )
 
 @Entity(tableName = "documents")

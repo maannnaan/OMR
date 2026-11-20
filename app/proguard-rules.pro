@@ -1,8 +1,9 @@
 # OpenCV calls into native code by name
 -keep class org.opencv.** { *; }
 
-# Question bank JSON models (parsed with Gson)
+# Question bank and Lecturer.bd JSON models (parsed with Gson by field name)
 -keep class com.omrscanner.app.data.bank.** { *; }
+-keep class com.omrscanner.app.data.lecturer.** { *; }
 -keepattributes Signature, *Annotation*
 
 # Retrofit

@@ -14,6 +14,8 @@ import com.omrscanner.app.data.db.DocPageEntity
 import com.omrscanner.app.data.db.DocumentEntity
 import com.omrscanner.app.data.db.ExamEntity
 import com.omrscanner.app.data.db.SheetEntity
+import com.omrscanner.app.data.lecturer.LecturerException
+import com.omrscanner.app.data.lecturer.UploadSheet
 import com.omrscanner.app.docs.PageSize
 import com.omrscanner.app.docs.PdfExporter
 import com.omrscanner.app.docs.PdfQuality
@@ -65,6 +67,80 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val paper: Paper = withContext(Dispatchers.IO) { c.bank.paper(p.id) }
         val n = c.exams.applyPaper(exam, paper)
         done(n)
+    }
+
+    // ── Lecturer.bd ─────────────────────────────────────────
+    /** Runs a Lecturer.bd call; if it says the session is gone, the app signs out too. */
+    private suspend fun <T> lecturer(block: suspend () -> T): T = try {
+        withContext(Dispatchers.IO) { block() }
+    } catch (e: LecturerException) {
+        if (e.signedOut) settings.lecturerSignOut()
+        throw e
+    }
+
+    fun lecturerSignIn(identifier: String, password: String, done: (Boolean) -> Unit) = viewModelScope.launch {
+        try {
+            val r = lecturer { c.lecturer.login(identifier.trim(), password) }
+            settings.lecturerSignIn(r.token, r.teacher.name)
+            toast("Signed in to Lecturer.bd as ${r.teacher.name}")
+            done(true)
+        } catch (e: Exception) {
+            toast(e.message ?: "Couldn't sign in")
+            done(false)
+        }
+    }
+
+    fun lecturerSignOut() = viewModelScope.launch {
+        withContext(Dispatchers.IO) { c.lecturer.logout() }
+        settings.lecturerSignOut()
+        toast("Signed out of Lecturer.bd")
+    }
+
+    suspend fun searchLecturer(q: String): List<PaperSummary> = lecturer { c.lecturer.search(q) }
+
+    /** Sets up an exam from a Lecturer.bd paper (or opens the one made from it before). */
+    fun importLecturerPaper(p: PaperSummary, opened: (Long) -> Unit, failed: () -> Unit) = viewModelScope.launch {
+        try {
+            val paper = lecturer { c.lecturer.lecturerPaper(p.id) }
+            opened(c.exams.importLecturerPaper(paper, SimpleDateFormat("MMM d", Locale.getDefault()).format(Date())))
+        } catch (e: Exception) {
+            toast(e.message ?: "Couldn't import the paper")
+            failed()
+        }
+    }
+
+    /**
+     * Sends the exam's checked sheets that Lecturer.bd doesn't have yet (in batches), then says what
+     * happened: how many were saved there, and which were refused and why.
+     */
+    fun uploadResults(b: ExamBundle, done: (String?) -> Unit) = viewModelScope.launch {
+        val paperId = b.exam.remotePaperId ?: return@launch done(null)
+        val sending = b.toUpload
+        if (sending.isEmpty()) { toast("Nothing new to upload"); return@launch done(null) }
+        var saved = 0
+        val refused = mutableListOf<String>()
+        try {
+            sending.chunked(200).forEach { batch ->
+                val r = lecturer { c.lecturer.upload(paperId, batch.map { UploadSheet(it.roll, it.setCode, it.marks, it.scannedAt) }) }
+                c.exams.markUploaded(batch.zip(r.sheets).filter { (_, result) -> result.ok }.map { (sheet, _) -> sheet.id }, System.currentTimeMillis())
+                saved += r.saved
+                r.sheets.filterNot { it.ok }.forEach {
+                    refused += "Roll ${it.roll}: " + when (it.error) {
+                        "roll" -> "the roll can't be read"
+                        "set" -> "that set code isn't on the paper"
+                        "marks" -> "the marks can't be read"
+                        else -> "refused"
+                    }
+                }
+            }
+            done(
+                "$saved sheet${if (saved == 1) "" else "s"} uploaded to Lecturer.bd." +
+                    if (refused.isEmpty()) "" else "\n\nNot uploaded (fix these in review, then upload again):\n" + refused.joinToString("\n"),
+            )
+        } catch (e: Exception) {
+            toast(e.message ?: "Upload failed")
+            done(if (saved > 0) "$saved sheets uploaded before the connection failed. Upload again for the rest." else null)
+        }
     }
 
     suspend fun saveScan(examId: Long, r: OmrReader.Result): SheetEntity = c.exams.addScan(examId, r)

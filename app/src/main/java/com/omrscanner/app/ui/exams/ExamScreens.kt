@@ -159,6 +159,28 @@ fun NewExamScreen(vm: AppViewModel, nav: NavController) {
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { BackBar("Exams", { nav.popBackStack() }) }
         item { ScreenTitle("New exam", "You'll design the answer sheet and add the key next.") }
+        // A paper made on Lecturer.bd brings its keys, students and sheet layout with it.
+        item {
+            AppCard(
+                Modifier.padding(top = 16.dp).clickable {
+                    if (vm.settings.lecturerSignedIn) nav.navigate(Routes.LECTURER_IMPORT)
+                    else { vm.toast("Sign in to Lecturer.bd first"); nav.navigate(Routes.SETTINGS) }
+                },
+                padding = PaddingValues(14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Import from Lecturer.bd", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text(
+                            if (vm.settings.lecturerSignedIn) "A final question paper, with every set's key and the students' rolls" else "Sign in to Lecturer.bd in Settings to use your question papers",
+                            fontSize = 12.sp, color = Muted,
+                        )
+                    }
+                    Text("›", fontSize = 18.sp, color = Muted)
+                }
+            }
+            SectionLabel("Or set one up here")
+        }
         item {
             Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(title, { title = it }, label = { Text("Exam name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -255,6 +277,9 @@ fun ExamDetailScreen(vm: AppViewModel, nav: NavController, id: Long) {
             )
             if (b.noKey && b.left > 0) Text("Add the answer key first — sheets scanned without one can't be graded.", color = Warn, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
         }
+
+        // an exam from a Lecturer.bd paper sends its results back there
+        if (b.fromLecturer) item { LecturerUploadCard(vm, b) }
 
         // results
         item { SectionLabel("Results") }

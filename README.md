@@ -109,6 +109,35 @@ The client lives in `data/bank/QuestionBank.kt` (`RemoteQuestionBank`).
 
 ---
 
+## Lecturer.bd
+
+Teachers on [Lecturer.bd](https://lecturer-nine.vercel.app) make their question papers there (sets shuffled from their question bank) and use this app to scan the answer sheets.
+
+1. **Settings → Lecturer.bd**: sign in with the same mobile number and password as on the website. The session token is kept in its own preferences file, left out of backups (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`). While signed in, the question bank is the teacher's final Lecturer.bd papers.
+2. **New exam → Import from Lecturer.bd**: pick a final paper. The exam comes set up: the answer sheet as Lecturer.bd lays it out (Bangla labels, roll digits, set-code grid), the students by roll, and every set's key. Importing the same paper again opens that exam.
+3. Print the sheets, scan them, review the unclear ones.
+4. **Upload results** on the exam's page sends the checked sheets Lecturer.bd doesn't have yet. Lecturer.bd marks each one again itself against its set's key (with its own negative marking) and answers sheet by sheet; refused ones (an unreadable roll, a set code not on the paper) are listed. A sheet changed in review afterwards is sent again with the next upload.
+
+The API (Lecturer.bd's `src/server/omr-api.ts`), always with `Authorization: Bearer <token>` after signing in:
+
+```
+POST /api/omr/login              { identifier, password }  → { token, teacher: { name, handle } }
+POST /api/omr/logout             → 204
+GET  /api/omr/papers?q=          → [PaperSummary]          (final papers with MCQs)
+GET  /api/omr/papers/{id}        → Paper + layout { labels, language, rollDigits, setCode, institution, examName }
+                                          + students [{ roll, name }]   (rolls padded to rollDigits)
+POST /api/omr/papers/{id}/results { sheets: [{ roll, setCode, marks, scannedAt }] }   (marks in MarkCodec form)
+                                 → { saved, sheets: [{ roll, ok, name, score, total } | { roll, ok: false, error }] }
+```
+
+The client is `data/lecturer/LecturerApi.kt`. Database version 2 adds `exams.remotePaperId` and `sheets.uploadedAt` (migration in `AppDatabase.kt`).
+
+## Releases
+
+`.github/workflows/release.yml` builds a signed release APK on a version tag (`git tag v1.1.0 && git push origin v1.1.0`) and attaches it to a GitHub Release as `omr-scanner.apk`, so `https://github.com/maannnaan/OMR/releases/latest/download/omr-scanner.apk` is always the newest. Every release must be signed with the same key, or phones refuse the update. The workflow takes it from four repository secrets: `OMR_KEYSTORE_BASE64`, `OMR_KEYSTORE_PASSWORD`, `OMR_KEY_ALIAS`, `OMR_KEY_PASSWORD`. To build a signed release locally, put a `keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`; ignored by git) beside this README and run `gradlew assembleRelease`. Release builds carry only the phones' native libraries (arm64-v8a, armeabi-v7a).
+
+---
+
 ## Project structure
 
 ```
@@ -128,6 +157,7 @@ app/src/main/java/com/omrscanner/app/
 ├── data/
 │   ├── db/                   Room entities, DAOs, database
 │   ├── bank/QuestionBank.kt  remote API + sample bank
+│   ├── lecturer/LecturerApi.kt  Lecturer.bd: sign-in, papers, result upload
 │   ├── ExamBundle.kt         grading questions the screens ask
 │   ├── Repositories.kt       exams, sheets, keys, documents, CSV export
 │   ├── FileStore.kt          storage, share, save to Downloads
@@ -145,4 +175,4 @@ tools/omr_simulation.py       algorithm test bench (Python + OpenCV)
 ```
 
 ## Data and privacy
-Everything is stored on the phone: a Room database plus image files under the app's private storage. Nothing leaves the device unless you share or export a file, or connect a question-bank server.
+Everything is stored on the phone: a Room database plus image files under the app's private storage. Nothing leaves the device unless you share or export a file, connect a question-bank server, or upload results to Lecturer.bd (then only each sheet's roll, set code, marks and scan time; never the photos).

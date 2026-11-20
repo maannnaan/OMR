@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -19,12 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,7 +38,9 @@ import com.omrscanner.app.ui.AppViewModel
 import com.omrscanner.app.ui.Routes
 import com.omrscanner.app.ui.components.AppCard
 import com.omrscanner.app.ui.components.BackBar
+import com.omrscanner.app.ui.components.PrimaryButton
 import com.omrscanner.app.ui.components.RowDivider
+import com.omrscanner.app.ui.components.SecondaryButton
 import com.omrscanner.app.ui.components.SectionLabel
 import com.omrscanner.app.ui.components.Segmented
 import com.omrscanner.app.ui.components.Stepper
@@ -43,6 +49,7 @@ import com.omrscanner.app.ui.theme.Good
 import com.omrscanner.app.ui.theme.Ink
 import com.omrscanner.app.ui.theme.Mono
 import com.omrscanner.app.ui.theme.Muted
+import com.omrscanner.app.ui.theme.Paper
 import com.omrscanner.app.ui.theme.SegBg
 import kotlinx.coroutines.delay
 
@@ -65,17 +72,28 @@ fun SettingsScreen(vm: AppViewModel, nav: NavController) {
                 SettingStepper("Erased-mark threshold", "A second mark lighter than this share of the darker one counts as erased.", "${s.erasePct}%", { s.erasePct -= 5 }, { s.erasePct += 5 })
             }
         }
+        item { SectionLabel("Lecturer.bd") }
+        item { LecturerCard(vm) }
         item { SectionLabel("Question bank") }
         item {
             AppCard {
                 Column(Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(5.dp)).background(Good).padding(5.dp))
-                        Text(if (s.bankUrl.isBlank()) "Using the built-in sample bank" else "Connected to your server", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                        Text(
+                            when {
+                                s.lecturerSignedIn -> "Using your Lecturer.bd papers"
+                                s.bankUrl.isBlank() -> "Using the built-in sample bank"
+                                else -> "Connected to your server"
+                            },
+                            fontWeight = FontWeight.Medium, fontSize = 15.sp,
+                        )
                     }
-                    var url by rememberSaveable { mutableStateOf(s.bankUrl) }
-                    OutlinedTextField(url, { url = it; s.bankUrl = it }, label = { Text("Server URL (optional)") }, placeholder = { Text("https://school.example/api/") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-                    Text("Answer keys are fetched from GET {url}/papers and {url}/papers/{id}. See README.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
+                    if (!s.lecturerSignedIn) {
+                        var url by rememberSaveable { mutableStateOf(s.bankUrl) }
+                        OutlinedTextField(url, { url = it; s.bankUrl = it }, label = { Text("Server URL (optional)") }, placeholder = { Text("https://school.example/api/") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                        Text("Answer keys are fetched from GET {url}/papers and {url}/papers/{id}. See README.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
+                    }
                 }
                 RowDivider()
                 Row(Modifier.fillMaxWidth().clickable { nav.navigate(Routes.BANK) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -91,7 +109,54 @@ fun SettingsScreen(vm: AppViewModel, nav: NavController) {
                 Text("Printed on new answer sheets", fontSize = 12.sp, color = Muted)
                 OutlinedTextField(school, { school = it; s.schoolName = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
             }
-            Text("OMR Scanner · version 1.0", fontSize = 12.sp, color = Faint, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text("OMR Scanner · version 1.1", fontSize = 12.sp, color = Faint, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        }
+    }
+}
+
+/** Signing in to Lecturer.bd with the teacher's own mobile number and password, or out again. */
+@Composable
+private fun LecturerCard(vm: AppViewModel) {
+    val s = vm.settings
+    AppCard(padding = PaddingValues(14.dp)) {
+        if (s.lecturerSignedIn) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(5.dp)).background(Good).padding(5.dp))
+                Text("Signed in as ${s.lecturerName}", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+            }
+            Text("Your final question papers are the question bank. Import one as an exam from New exam, and upload its results from the exam's page.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
+            SecondaryButton("Sign out", { vm.lecturerSignOut() }, Modifier.padding(top = 10.dp))
+        } else {
+            var identifier by rememberSaveable { mutableStateOf("") }
+            var password by remember { mutableStateOf("") }
+            var busy by remember { mutableStateOf(false) }
+            var changeServer by rememberSaveable { mutableStateOf(false) }
+            Text("Sign in with your Lecturer.bd mobile number and password to bring in your question papers and send results back.", fontSize = 13.sp, color = Muted)
+            OutlinedTextField(
+                identifier, { identifier = it }, label = { Text("Mobile number or email") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            )
+            OutlinedTextField(
+                password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            PrimaryButton(
+                if (busy) "Signing in…" else "Sign in",
+                {
+                    if (identifier.isBlank() || password.isEmpty()) vm.toast("Enter your mobile number and password")
+                    else if (!busy) { busy = true; vm.lecturerSignIn(identifier, password) { ok -> busy = false; if (ok) password = "" } }
+                },
+                Modifier.padding(top = 12.dp), color = Ink, contentColor = Paper, enabled = !busy,
+            )
+            if (changeServer) {
+                var url by rememberSaveable { mutableStateOf(s.lecturerUrl) }
+                OutlinedTextField(url, { url = it; s.lecturerUrl = it }, label = { Text("Lecturer.bd address") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+            } else {
+                Text(
+                    "Server: ${s.lecturerUrl.removePrefix("https://")} · change", fontSize = 12.sp, color = Faint,
+                    modifier = Modifier.padding(top = 10.dp).clickable { changeServer = true },
+                )
+            }
         }
     }
 }

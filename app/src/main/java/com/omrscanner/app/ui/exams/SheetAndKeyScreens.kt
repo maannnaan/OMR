@@ -266,7 +266,13 @@ private fun BankPicker(vm: AppViewModel, b: com.omrscanner.app.data.ExamBundle, 
     Column {
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(q, { q = it }, label = { Text("Search question bank by title, subject or code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        SectionLabel(if (vm.settings.bankUrl.isBlank()) "Sample question bank" else "Question bank")
+        SectionLabel(
+            when {
+                vm.settings.lecturerSignedIn -> "Your Lecturer.bd papers"
+                vm.settings.bankUrl.isBlank() -> "Sample question bank"
+                else -> "Question bank"
+            },
+        )
         when (val list = results) {
             null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Ink) }
             else -> {

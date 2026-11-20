@@ -1,9 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+// The release key: from keystore.properties beside this project (never committed), or from the
+// environment, as .github/workflows/release.yml sets it from the repository's secrets.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signing(prop: String, env: String): String? = keystoreProps.getProperty(prop) ?: System.getenv(env)
 
 android {
     namespace = "com.omrscanner.app"
@@ -13,9 +23,20 @@ android {
         applicationId = "com.omrscanner.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        create("release") {
+            signing("storeFile", "OMR_KEYSTORE_FILE")?.let { path ->
+                storeFile = file(path)
+                storePassword = signing("storePassword", "OMR_KEYSTORE_PASSWORD")
+                keyAlias = signing("keyAlias", "OMR_KEY_ALIAS")
+                keyPassword = signing("keyPassword", "OMR_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -23,6 +44,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Signed when the release key is there; otherwise the APK comes out unsigned.
+            signingConfigs.getByName("release").takeIf { it.storeFile != null }?.let { signingConfig = it }
+            // Phones only: OpenCV's emulator (x86) libraries would double the download.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
     }
     compileOptions {

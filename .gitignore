@@ -12,4 +12,6 @@
 *.aab
 *.keystore
 *.jks
+# The release key's passwords (see .github/workflows/release.yml); never committed.
+keystore.properties
 __pycache__/

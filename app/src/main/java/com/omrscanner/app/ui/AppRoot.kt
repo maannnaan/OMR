@@ -41,6 +41,7 @@ import com.omrscanner.app.ui.exams.AnswerKeyScreen
 import com.omrscanner.app.ui.exams.ExamDetailScreen
 import com.omrscanner.app.ui.exams.ExamsScreen
 import com.omrscanner.app.ui.exams.InsightsScreen
+import com.omrscanner.app.ui.exams.LecturerImportScreen
 import com.omrscanner.app.ui.exams.NewExamScreen
 import com.omrscanner.app.ui.exams.ReviewScreen
 import com.omrscanner.app.ui.exams.RulesScreen
@@ -62,6 +63,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val NEW_EXAM = "exam/new"
     const val BANK = "bank"
+    const val LECTURER_IMPORT = "lecturer/import"
     fun exam(id: Long) = "exam/$id"
     fun sheet(id: Long) = "exam/$id/sheet"
     fun key(id: Long) = "exam/$id/key"
@@ -100,6 +102,7 @@ fun AppRoot() {
             composable(Routes.SETTINGS) { SettingsScreen(vm, nav) }
             composable(Routes.BANK) { QuestionBankScreen(vm, nav) }
             composable(Routes.NEW_EXAM) { NewExamScreen(vm, nav) }
+            composable(Routes.LECTURER_IMPORT) { LecturerImportScreen(vm, nav) }
             composable("exam/{id}", listOf(navArgument("id") { type = NavType.LongType })) { ExamDetailScreen(vm, nav, it.arguments!!.getLong("id")) }
             composable("exam/{id}/sheet", listOf(navArgument("id") { type = NavType.LongType })) { SheetBuilderScreen(vm, nav, it.arguments!!.getLong("id")) }
             composable("exam/{id}/key", listOf(navArgument("id") { type = NavType.LongType })) { AnswerKeyScreen(vm, nav, it.arguments!!.getLong("id")) }

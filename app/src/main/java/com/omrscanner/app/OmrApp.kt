@@ -12,6 +12,7 @@ import com.omrscanner.app.data.bank.RemoteQuestionBank
 import com.omrscanner.app.data.bank.SampleQuestionBank
 import com.omrscanner.app.data.db.AppDatabase
 import com.omrscanner.app.data.db.ExamEntity
+import com.omrscanner.app.data.lecturer.LecturerApi
 import org.opencv.android.OpenCVLoader
 
 class OmrApp : Application() {
@@ -33,9 +34,23 @@ class AppContainer(context: Context) {
     val exams = ExamRepository(db, files)
     val docs = DocRepository(db, files)
 
-    /** Your server when a URL is set in Settings, otherwise the built-in sample bank. */
+    private var lecturerFor: Pair<String, LecturerApi>? = null
+
+    /** Lecturer.bd at the server set in Settings (one client per address). */
+    val lecturer: LecturerApi
+        get() {
+            val url = settings.lecturerUrl
+            lecturerFor?.let { (at, api) -> if (at == url) return api }
+            return LecturerApi(url) { settings.lecturerToken }.also { lecturerFor = url to it }
+        }
+
+    /** Lecturer.bd's papers when signed in there; else your own server when a URL is set in Settings; else the built-in sample bank. */
     val bank: QuestionBank
-        get() = settings.bankUrl.takeIf { it.startsWith("http") }?.let { RemoteQuestionBank(it) } ?: SampleQuestionBank
+        get() = when {
+            settings.lecturerSignedIn -> lecturer
+            settings.bankUrl.startsWith("http") -> RemoteQuestionBank(settings.bankUrl)
+            else -> SampleQuestionBank
+        }
 
     /** First launch: one ready-to-scan exam so the app isn't empty. */
     suspend fun seedIfEmpty() {

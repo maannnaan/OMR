@@ -16,6 +16,7 @@ interface ExamDao {
 
     @Query("SELECT COUNT(*) FROM exams") suspend fun examCount(): Int
     @Query("SELECT * FROM exams WHERE id = :id") suspend fun exam(id: Long): ExamEntity?
+    @Query("SELECT * FROM exams WHERE remotePaperId = :paperId ORDER BY createdAt DESC LIMIT 1") suspend fun examForPaper(paperId: String): ExamEntity?
     @Insert suspend fun insertExam(e: ExamEntity): Long
     @Update suspend fun updateExam(e: ExamEntity)
     @Query("DELETE FROM exams WHERE id = :id") suspend fun deleteExam(id: Long)
@@ -33,6 +34,7 @@ interface ExamDao {
     @Query("SELECT * FROM sheets WHERE examId = :examId") suspend fun sheetsFor(examId: Long): List<SheetEntity>
     @Query("DELETE FROM sheets WHERE id = :id") suspend fun deleteSheet(id: Long)
     @Query("DELETE FROM sheets WHERE examId = :examId") suspend fun clearSheets(examId: Long)
+    @Query("UPDATE sheets SET uploadedAt = :at WHERE id IN (:ids)") suspend fun markUploaded(ids: List<Long>, at: Long)
 }
 
 @Dao

@@ -59,6 +59,12 @@ data class ExamBundle(
         null -> "${Grading.issues(marks(s), exam.doubleRule)} to check"
     }
 
+    /** Whether this exam came from a Lecturer.bd paper, so its results can go back there. */
+    val fromLecturer: Boolean get() = exam.remotePaperId != null
+    /** Sheets ready for Lecturer.bd: checked (or needing no check), and not sent since they last changed. */
+    val toUpload: List<SheetEntity> get() = sheets.filter { it.uploadedAt == null && !needsCheck(it) }
+    val uploadedCount: Int get() = sheets.count { it.uploadedAt != null }
+
     val percents: List<Double> get() = sheets.mapNotNull { s -> score(s)?.let { it * 100.0 / n } }
     val average: String get() = percents.takeIf { it.isNotEmpty() }?.let { "${it.average().toInt()}%" } ?: "—"
 }

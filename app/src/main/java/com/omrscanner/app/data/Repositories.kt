@@ -9,6 +9,8 @@ import com.omrscanner.app.data.db.DocumentEntity
 import com.omrscanner.app.data.db.ExamEntity
 import com.omrscanner.app.data.db.SheetEntity
 import com.omrscanner.app.data.db.StudentEntity
+import com.omrscanner.app.data.lecturer.LecturerPaper
+import com.omrscanner.app.data.lecturer.RosterEntry
 import com.omrscanner.app.docs.ImageOps
 import com.omrscanner.app.omr.KeyCodec
 import com.omrscanner.app.omr.MarkCodec
@@ -79,7 +81,36 @@ class ExamRepository(private val db: AppDatabase, private val files: FileStore) 
         s.copy(id = dao.insertSheet(s))
     }
 
-    suspend fun updateSheet(s: SheetEntity) = dao.updateSheet(s)
+    /** Saves a sheet changed in review. A changed sheet goes to Lecturer.bd again with the next upload. */
+    suspend fun updateSheet(s: SheetEntity) = dao.updateSheet(s.copy(uploadedAt = null))
+
+    /** Records that these sheets, as they are now, are on Lecturer.bd. */
+    suspend fun markUploaded(ids: List<Long>, at: Long) { if (ids.isNotEmpty()) dao.markUploaded(ids, at) }
+
+    /** The students exactly as given (rolls already as the sheet's roll grid reads them), replacing the list. */
+    suspend fun setRoster(examId: Long, roster: List<RosterEntry>) {
+        dao.clearStudents(examId)
+        dao.insertStudents(roster.map { StudentEntity(examId = examId, roll = it.roll, name = it.name) })
+    }
+
+    /**
+     * Sets up an exam from a final Lecturer.bd paper: the answer sheet laid out as Lecturer.bd says,
+     * its students by roll, and every set's key. A paper imported before opens its existing exam.
+     */
+    suspend fun importLecturerPaper(paper: LecturerPaper, date: String): Long {
+        dao.examForPaper(paper.id)?.let { return it.id }
+        val l = paper.layout
+        val id = dao.insertExam(
+            ExamEntity(
+                title = paper.title, className = paper.code, date = date, questions = paper.questions, options = paper.options,
+                labels = l.labels, language = l.language, rollDigits = l.rollDigits, setCode = l.setCode,
+                institution = l.institution, remotePaperId = paper.id,
+            ),
+        )
+        setRoster(id, paper.students)
+        dao.exam(id)?.let { applyPaper(it, paper.asPaper()) }
+        return id
+    }
     suspend fun deleteSheet(s: SheetEntity) { files.delete(s.imagePath); dao.deleteSheet(s.id) }
 
     /** results_<exam>.csv: roll, name, set, score, percent, then one column per question. */
