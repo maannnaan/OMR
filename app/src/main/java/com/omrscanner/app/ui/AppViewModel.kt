@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -51,15 +53,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ── exams ───────────────────────────────────────────────
-    fun createExam(exam: ExamEntity, names: List<String>, onCreated: (Long) -> Unit) = io {
-        val id = c.exams.create(exam.copy(institution = exam.institution.ifBlank { settings.schoolName }), names)
+    /**
+     * A new exam made here: students numbered 1, 2, 3… and one answer key per set (set codes 101, 102…;
+     * one set needs no set-code grid on the sheet). The sheet's look can change before printing.
+     */
+    fun createExam(title: String, questions: Int, students: Int, sets: Int, onCreated: (Long) -> Unit) = io {
+        val exam = ExamEntity(
+            title = title, className = "", date = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date()),
+            questions = questions, options = 4, rollDigits = maxOf(3, students.toString().length), setCode = sets > 1,
+            institution = settings.schoolName,
+        )
+        val id = c.exams.create(exam, List(students) { "Student ${it + 1}" }, List(sets) { (101 + it).toString() })
         onCreated(id)
     }
+
+    /** Whether there's a question bank to fill keys from: Lecturer.bd, or the teacher's own server. */
+    val bankAvailable: Boolean get() = settings.lecturerSignedIn || settings.bankUrl.startsWith("http")
     fun updateExam(exam: ExamEntity) = io { c.exams.update(exam) }
     fun deleteExam(id: Long) = io { c.exams.delete(id); toast("Exam deleted") }
     fun setStudents(b: ExamBundle, names: List<String>) = io { c.exams.setStudents(b.exam.id, b.exam.rollDigits, names); toast("${names.size} students saved") }
 
-    fun saveKey(examId: Long, set: String, key: IntArray, source: String? = null, edited: Boolean = false) = io { c.exams.saveKey(examId, set, key, source, edited) }
+    /** Key answers are saved one after another, in the order they were tapped. */
+    private val keyWrites = Mutex()
+    fun saveKey(examId: Long, set: String, key: IntArray, source: String? = null, edited: Boolean = false) =
+        io { keyWrites.withLock { c.exams.saveKey(examId, set, key, source, edited) } }
     fun deleteKey(examId: Long, set: String) = io { c.exams.deleteKey(examId, set) }
 
     suspend fun searchBank(q: String): List<PaperSummary> = withContext(Dispatchers.IO) { c.bank.search(q) }
@@ -144,17 +161,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun saveScan(examId: Long, r: OmrReader.Result): SheetEntity = c.exams.addScan(examId, r)
-    fun updateSheet(s: SheetEntity) = io { c.exams.updateSheet(s) }
+    private val sheetWrites = Mutex()
+    fun updateSheet(s: SheetEntity) = io { sheetWrites.withLock { c.exams.updateSheet(s) } }
     fun deleteSheet(s: SheetEntity) = io { c.exams.deleteSheet(s) }
 
     fun shareResults(b: ExamBundle) = io { files.share(c.exams.exportCsv(b), "text/csv", "Share results") }
 
-    /** Printable answer sheets — one copy per student. */
-    fun shareSheetPdf(exam: ExamEntity, copies: Int, save: Boolean) = io {
-        val f = files.exportFile("${exam.title} — answer sheet.pdf")
-        withContext(Dispatchers.Default) { SheetPdf.write(exam.layout(), copies, f) }
-        if (save) toast("Saved to " + files.saveToDownloads(f, "application/pdf")) else files.share(f, "application/pdf", "Print or share answer sheets")
+    /** The printable answer sheets, one A4 page per student, then [then] with the PDF. */
+    private fun sheetPdf(exam: ExamEntity, copies: Int, then: (File) -> Unit) = io {
+        val f = files.exportFile("${exam.title} - answer sheets.pdf")
+        withContext(Dispatchers.Default) { SheetPdf.write(exam.layout(), copies.coerceAtLeast(1), f) }
+        then(f)
     }
+
+    /** Android's print dialog for the sheets (it can also save them as a PDF). */
+    fun printSheets(activity: android.content.Context, b: ExamBundle) = sheetPdf(b.exam, b.total) { files.print(activity, it, b.exam.title) }
+
+    /** The sheets as a PDF to send on, e.g. to a print shop. */
+    fun shareSheets(b: ExamBundle) = sheetPdf(b.exam, b.total) { files.share(it, "application/pdf", "Send the answer sheets") }
 
     // ── documents ───────────────────────────────────────────
     fun importScan(uris: List<Uri>, idCard: Boolean, intoDoc: Long?, opened: (Long) -> Unit) = io {

@@ -1,5 +1,7 @@
 *.iml
 .gradle/
+# Kotlin 2's per-build session and error files
+.kotlin/
 /local.properties
 /.idea/
 .DS_Store

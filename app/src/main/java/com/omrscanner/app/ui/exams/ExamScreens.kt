@@ -1,32 +1,43 @@
 package com.omrscanner.app.ui.exams
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Quiz
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,42 +45,45 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.omrscanner.app.data.ExamBundle
 import com.omrscanner.app.data.db.ExamEntity
+import com.omrscanner.app.data.db.SheetEntity
 import com.omrscanner.app.ui.AppViewModel
 import com.omrscanner.app.ui.Routes
 import com.omrscanner.app.ui.components.AppCard
-import com.omrscanner.app.ui.components.BackBar
+import com.omrscanner.app.ui.components.Banner
+import com.omrscanner.app.ui.components.ChoiceDialog
+import com.omrscanner.app.ui.components.Chip
+import com.omrscanner.app.ui.components.ConfirmDialog
+import com.omrscanner.app.ui.components.EmptyState
+import com.omrscanner.app.ui.components.Field
+import com.omrscanner.app.ui.components.Hint
+import com.omrscanner.app.ui.components.Pill
 import com.omrscanner.app.ui.components.PrimaryButton
 import com.omrscanner.app.ui.components.RowDivider
-import com.omrscanner.app.ui.components.ScreenTitle
-import com.omrscanner.app.ui.components.SectionLabel
-import com.omrscanner.app.ui.components.Segmented
-import com.omrscanner.app.ui.components.StatTile
-import com.omrscanner.app.ui.components.Stepper
-import com.omrscanner.app.ui.theme.Accent
-import com.omrscanner.app.ui.theme.CardBg
-import com.omrscanner.app.ui.theme.Divider
-import com.omrscanner.app.ui.theme.Good
-import com.omrscanner.app.ui.theme.GoodBg
+import com.omrscanner.app.ui.components.Screen
+import com.omrscanner.app.ui.components.SecondaryButton
+import com.omrscanner.app.ui.components.SectionTitle
+import com.omrscanner.app.ui.components.SettingRow
+import com.omrscanner.app.ui.components.StepRow
+import com.omrscanner.app.ui.components.StepState
+import com.omrscanner.app.ui.components.TextDialog
+import com.omrscanner.app.ui.components.Tone
+import com.omrscanner.app.ui.components.plural
+import com.omrscanner.app.ui.components.text
+import com.omrscanner.app.ui.theme.Bad
+import com.omrscanner.app.ui.theme.Brand
+import com.omrscanner.app.ui.theme.BrandSoft
 import com.omrscanner.app.ui.theme.Ink
-import com.omrscanner.app.ui.theme.Line
-import com.omrscanner.app.ui.theme.Mono
+import com.omrscanner.app.ui.theme.InsetBg
 import com.omrscanner.app.ui.theme.Muted
-import com.omrscanner.app.ui.theme.Paper
-import com.omrscanner.app.ui.theme.SegBg
 import com.omrscanner.app.ui.theme.Warn
-import com.omrscanner.app.ui.theme.WarnBg
-import com.omrscanner.app.ui.theme.WarnLine
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun rememberBundle(vm: AppViewModel, id: Long): ExamBundle? {
@@ -77,72 +91,65 @@ fun rememberBundle(vm: AppViewModel, id: Long): ExamBundle? {
     return all.firstOrNull { it.exam.id == id }
 }
 
-// ── Exams list ──────────────────────────────────────────────
+/** "30 questions · 28 students · 4 sets" */
+fun ExamBundle.meta(): String = buildList {
+    add(plural(n, "question"))
+    add(plural(total, "student"))
+    if (exam.setCode) add(plural(sets.size, "set"))
+}.joinToString(" · ")
+
+/** How an exam stands, in a few words: what its card on Home says. */
+fun ExamBundle.status(): Pair<String, Tone> = when {
+    noKey -> "Add the answer key" to Tone.WARN
+    keyGaps.isNotEmpty() -> "Answer key not finished" to Tone.WARN
+    reviewCount > 0 -> "${plural(reviewCount, "sheet")} to check" to Tone.WARN
+    sheets.isEmpty() -> "Ready to scan" to Tone.NEUTRAL
+    fromLecturer && toUpload.isNotEmpty() -> "${toUpload.size} not sent to Lecturer.bd yet" to Tone.WARN
+    else -> "${plural(sheets.size, "sheet")} scanned · average $average" to Tone.GOOD
+}
+
+// ── Home: the exams ─────────────────────────────────────────
 
 @Composable
 fun ExamsScreen(vm: AppViewModel, nav: NavController) {
     val bundles by vm.bundles.collectAsStateWithLifecycle()
-    val today = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date()) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
-                    Text(today, color = Muted, fontSize = 14.sp)
-                    Text("Exams", fontSize = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.8).sp)
-                }
-                Box(Modifier.clip(RoundedCornerShape(999.dp)).background(CardBg).border(1.dp, Line, RoundedCornerShape(999.dp)).clickable { nav.navigate(Routes.NEW_EXAM) }.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Text("+  New exam", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                }
-            }
+    ExamsContent(
+        bundles,
+        onOpen = { nav.navigate(Routes.exam(it)) },
+        onNew = { nav.navigate(Routes.NEW_EXAM) },
+        onSettings = { nav.navigate(Routes.SETTINGS) },
+    )
+}
+
+@Composable
+fun ExamsContent(bundles: List<ExamBundle>, onOpen: (Long) -> Unit, onNew: () -> Unit, onSettings: () -> Unit) {
+    Screen(
+        title = "Exams",
+        actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = Ink) } },
+        bottom = { PrimaryButton("New exam", onNew, icon = Icons.Outlined.Add) },
+    ) {
+        if (bundles.isEmpty()) item {
+            EmptyState(Icons.Outlined.Quiz, "No exams yet", "Make an exam, print its answer sheets, then scan them after the test.")
         }
-        // what needs the teacher right now
-        val attention = bundles.flatMap { b ->
-            buildList {
-                if (b.noKey) add(Triple("!", "${b.exam.title} has no answer key", Routes.key(b.exam.id)))
-                if (b.reviewCount > 0) add(Triple("${b.reviewCount}", "${b.reviewCount} sheet${if (b.reviewCount > 1) "s" else ""} to review · ${b.exam.title}", Routes.exam(b.exam.id)))
-            }
-        }
-        if (attention.isNotEmpty()) item { Spacer(Modifier.height(16.dp)) }
-        items(attention) { (n, title, route) ->
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(RoundedCornerShape(16.dp)).background(WarnBg).border(1.dp, WarnLine, RoundedCornerShape(16.dp))
-                    .clickable { nav.navigate(route) }.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(28.dp).clip(CircleShape).background(Warn), contentAlignment = Alignment.Center) { Text(n, color = Color.White, fontFamily = Mono, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
-                Text(title, color = Warn, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                Text("›", color = Warn, fontSize = 18.sp)
-            }
-        }
-        item { SectionLabel("All exams") }
-        if (bundles.isEmpty()) item { Text("No exams yet — tap New exam to set one up.", color = Muted, modifier = Modifier.padding(8.dp)) }
-        items(bundles, key = { it.exam.id }) { b -> ExamCard(b) { nav.navigate(Routes.exam(b.exam.id)) } }
+        items(bundles, key = { it.exam.id }) { b -> ExamCard(b) { onOpen(b.exam.id) } }
     }
 }
 
 @Composable
 private fun ExamCard(b: ExamBundle, onClick: () -> Unit) {
-    val (status, bg, fg) = when {
-        b.sheets.isEmpty() -> Triple("Not started", SegBg, Muted)
-        b.left == 0 -> Triple("Complete", GoodBg, Good)
-        else -> Triple("Grading", WarnBg, Warn)
-    }
-    AppCard(Modifier.padding(bottom = 10.dp).clickable(onClick = onClick), padding = PaddingValues(16.dp)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text(b.exam.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text("${b.exam.className} · ${b.exam.date}", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 3.dp))
+    val (status, tone) = b.status()
+    AppCard(onClick = onClick, padding = 16.dp) {
+        Text(b.exam.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(b.meta(), fontSize = 14.sp, color = Muted, modifier = Modifier.padding(top = 2.dp))
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(if (tone == Tone.NEUTRAL) Muted else tone.text()))
+            Text(status, color = if (tone == Tone.NEUTRAL) Ink else tone.text(), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).padding(start = 8.dp))
+            if (b.fromLecturer) Pill("Lecturer.bd", Tone.NEUTRAL)
+        }
+        if (b.sheets.isNotEmpty() && b.total > 0) {
+            Box(Modifier.padding(top = 12.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(InsetBg)) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth((b.sheets.size.toFloat() / b.total).coerceIn(0f, 1f)).background(Brand))
             }
-            Box(Modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp)) { Text(status, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-        }
-        Box(Modifier.padding(top = 12.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Divider)) {
-            val f = if (b.total == 0) 0f else b.sheets.size.toFloat() / b.total
-            Box(Modifier.fillMaxHeight().fillMaxWidth(f.coerceIn(0f, 1f)).background(if (b.left > 0) Accent else Good))
-        }
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${b.sheets.size}/${b.total} scanned   ${b.average} avg   ${b.n} Qs", fontFamily = Mono, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            val note = when { b.noKey -> "No answer key"; b.keyGaps.isNotEmpty() -> "Key incomplete"; b.reviewCount > 0 -> "${b.reviewCount} to review"; else -> null }
-            if (note != null) Text(note, color = Warn, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -151,204 +158,320 @@ private fun ExamCard(b: ExamBundle, onClick: () -> Unit) {
 
 @Composable
 fun NewExamScreen(vm: AppViewModel, nav: NavController) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var cls by rememberSaveable { mutableStateOf("") }
-    var date by rememberSaveable { mutableStateOf(SimpleDateFormat("MMM d", Locale.getDefault()).format(Date())) }
-    var count by rememberSaveable { mutableStateOf(30) }
-    var names by rememberSaveable { mutableStateOf("") }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { BackBar("Exams", { nav.popBackStack() }) }
-        item { ScreenTitle("New exam", "You'll design the answer sheet and add the key next.") }
-        // A paper made on Lecturer.bd brings its keys, students and sheet layout with it.
-        item {
-            AppCard(
-                Modifier.padding(top = 16.dp).clickable {
-                    if (vm.settings.lecturerSignedIn) nav.navigate(Routes.LECTURER_IMPORT)
-                    else { vm.toast("Sign in to Lecturer.bd first"); nav.navigate(Routes.SETTINGS) }
-                },
-                padding = PaddingValues(14.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Import from Lecturer.bd", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                        Text(
-                            if (vm.settings.lecturerSignedIn) "A final question paper, with every set's key and the students' rolls" else "Sign in to Lecturer.bd in Settings to use your question papers",
-                            fontSize = 12.sp, color = Muted,
-                        )
-                    }
-                    Text("›", fontSize = 18.sp, color = Muted)
-                }
-            }
-            SectionLabel("Or set one up here")
-        }
-        item {
-            Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Exam name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(cls, { cls = it }, label = { Text("Class / section") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(date, { date = it }, label = { Text("Date") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                AppCard(padding = PaddingValues(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Students", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                            Text("Rolls are numbered 1, 2, 3…", fontSize = 12.sp, color = Muted)
-                        }
-                        Stepper("$count", { count = (count - 1).coerceAtLeast(1) }, { count = (count + 1).coerceAtMost(999) })
-                    }
-                }
-                OutlinedTextField(
-                    names, { names = it }, label = { Text("Student names (optional, one per line, in roll order)") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
-                )
-            }
-        }
-        item {
-            Spacer(Modifier.height(18.dp))
-            PrimaryButton("Create exam", {
-                if (title.isBlank()) { vm.toast("Give the exam a name"); return@PrimaryButton }
-                val list = names.lines().map { it.trim() }.filter { it.isNotEmpty() }
-                val roster = List(maxOf(count, list.size)) { i -> list.getOrElse(i) { "Student ${i + 1}" } }
-                vm.createExam(ExamEntity(title = title.trim(), className = cls.trim(), date = date.trim()), roster) { id ->
-                    nav.popBackStack(); nav.navigate(Routes.exam(id))
-                }
-            })
-        }
-    }
-}
-
-// ── Exam hub ────────────────────────────────────────────────
-
-private enum class ListTab { REVIEW, SCANNED, REMAINING }
-
-@Composable
-fun ExamDetailScreen(vm: AppViewModel, nav: NavController, id: Long) {
-    val b = rememberBundle(vm, id) ?: return
-    var tab by rememberSaveable { mutableStateOf(if (b.reviewCount > 0) ListTab.REVIEW else ListTab.SCANNED) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    val layout = b.layout
-    val labels = layout.optionLabels()
-
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
-        item {
-            BackBar("Exams", { nav.popBackStack() }) {
-                TextButton({ vm.shareResults(b) }) { Text("Export CSV", color = Ink, fontWeight = FontWeight.SemiBold) }
-                TextButton({ confirmDelete = true }) { Text("Delete", color = com.omrscanner.app.ui.theme.Bad) }
-            }
-        }
-        item { ScreenTitle(b.exam.title, "${b.exam.className} · ${b.exam.date} · ${b.total} students") }
-
-        // setup checklist
-        val keyLine = when {
-            b.noKey -> "Missing — fetch from the question bank or enter it"
-            b.keyGaps.isNotEmpty() -> if (b.exam.setCode) "${b.keyGaps.size} of ${b.sets.size} sets incomplete" else "${b.keyDone(b.sets.first())}/${b.n} answers entered"
-            else -> (if (b.exam.setCode) "${b.sets.size} set${if (b.sets.size > 1) "s" else ""} complete" else "Complete") +
-                (if (b.keyRows.any { it.source != null }) " · from question bank" else " · entered manually")
-        }
-        val steps = listOf(
-            Step("Students", "${b.total} on the roll list", true, "Edit") { nav.navigate(Routes.students(id)) },
-            Step("Answer sheet", "${b.n} questions · ${labels.first()}–${labels.last()}" + (if (layout.rollDigits > 0) " · ${layout.rollDigits}-digit roll" else "") + (if (layout.setCode) " · set code" else ""), true, if (b.sheets.isEmpty()) "Edit" else "View") { nav.navigate(Routes.sheet(id)) },
-            Step("Answer key", keyLine, b.keyGaps.isEmpty(), if (b.noKey) "Add" else if (b.keyGaps.isNotEmpty()) "Finish" else "Edit") { nav.navigate(Routes.key(id)) },
-            Step("Grading rules", "Double fill: " + (if (b.exam.doubleRule == "wrong") "counted wrong" else "sent to review") + " · blanks score 0", true, "Edit") { nav.navigate(Routes.rules(id)) },
-        )
-        val ready = steps.count { it.ok }
-        item { SectionLabel("Setup", trailing = if (ready == steps.size) "Ready to scan" else "$ready of ${steps.size} ready", trailingColor = if (ready == steps.size) Good else Warn) }
-        item {
-            AppCard {
-                steps.forEachIndexed { i, s ->
-                    if (i > 0) RowDivider()
-                    Row(Modifier.fillMaxWidth().clickable(onClick = s.go).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(28.dp).clip(CircleShape).background(if (s.ok) GoodBg else Warn), contentAlignment = Alignment.Center) {
-                            Text(if (s.ok) "✓" else "${i + 1}", color = if (s.ok) Good else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        }
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(s.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                            Text(s.sub, fontSize = 12.sp, color = if (s.ok) Muted else Warn)
-                        }
-                        Text("${s.cta} ›", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (s.ok) Muted else Ink)
-                    }
-                }
-            }
-        }
-        item {
-            Spacer(Modifier.height(14.dp))
-            PrimaryButton(
-                if (b.left > 0) (if (b.sheets.isEmpty()) "Start scanning" else "Continue scanning · ${b.left} left") else "All sheets scanned",
-                { if (b.left > 0) nav.navigate(Routes.scan(id)) else vm.toast("Every sheet for this exam is scanned") },
-                color = if (b.left > 0) Accent else Line,
-            )
-            if (b.noKey && b.left > 0) Text("Add the answer key first — sheets scanned without one can't be graded.", color = Warn, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-        }
-
-        // an exam from a Lecturer.bd paper sends its results back there
-        if (b.fromLecturer) item { LecturerUploadCard(vm, b) }
-
-        // results
-        item { SectionLabel("Results") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile(b.average, "Class average", Modifier.weight(1f))
-                StatTile("${b.sheets.size}/${b.total}", "Scanned", Modifier.weight(1f))
-                StatTile("${b.reviewCount}", "To review", Modifier.weight(1f), valueColor = if (b.reviewCount > 0) Warn else Ink, bg = if (b.reviewCount > 0) WarnBg else CardBg)
-            }
-            Spacer(Modifier.height(12.dp))
-            Segmented(
-                listOf(ListTab.REVIEW to "To review ${b.reviewCount}", ListTab.SCANNED to "Scanned ${b.sheets.size}", ListTab.REMAINING to "Not yet ${b.unmatched.size}"),
-                tab, { tab = it },
-            )
-            Spacer(Modifier.height(12.dp))
-        }
-        item {
-            AppCard {
-                val rows = when (tab) {
-                    ListTab.REMAINING -> emptyList()
-                    ListTab.REVIEW -> b.sheets.filter { b.needsCheck(it) }
-                    ListTab.SCANNED -> b.sheets.sortedByDescending { b.needsCheck(it) }
-                }
-                if (tab == ListTab.REMAINING) {
-                    if (b.unmatched.isEmpty()) Text("Everyone's sheet is in.", color = Muted, modifier = Modifier.padding(24.dp))
-                    b.unmatched.forEachIndexed { i, st ->
-                        if (i > 0) RowDivider()
-                        StudentRow(st.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString(""), st.name, "Roll ${st.roll} · not scanned", null, "—", Muted) { if (b.left > 0) nav.navigate(Routes.scan(id)) }
-                    }
-                } else {
-                    if (rows.isEmpty()) Text(if (tab == ListTab.REVIEW) (if (b.sheets.isEmpty()) "No sheets scanned yet." else "Nothing to review — every scanned sheet is clear.") else "No sheets yet. Tap scan to begin.", color = Muted, modifier = Modifier.padding(24.dp))
-                    rows.forEachIndexed { i, s ->
-                        if (i > 0) RowDivider()
-                        val known = b.student(s.roll) != null
-                        val name = b.nameOf(s)
-                        StudentRow(
-                            if (known) name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("") else "?",
-                            name, "Roll ${s.roll} · " + (if (s.approved) "approved" else "scanned"),
-                            if (b.needsCheck(s)) b.flagText(s) else null, "${b.score(s) ?: "—"}/${b.n}", if (known) Ink else Warn,
-                        ) { nav.navigate(Routes.review(id, s.id)) }
-                    }
-                }
-            }
-        }
-    }
-
-    if (confirmDelete) AlertDialog(
-        onDismissRequest = { confirmDelete = false },
-        title = { Text("Delete this exam?") },
-        text = { Text("Its students, answer keys and all ${b.sheets.size} scanned sheets will be removed.") },
-        confirmButton = { TextButton({ confirmDelete = false; vm.deleteExam(id); nav.popBackStack() }) { Text("Delete", color = com.omrscanner.app.ui.theme.Bad) } },
-        dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel") } },
+    NewExamContent(
+        signedIn = vm.settings.lecturerSignedIn,
+        onBack = { nav.popBackStack() },
+        onLecturer = { nav.navigate(if (vm.settings.lecturerSignedIn) Routes.LECTURER_PAPERS else Routes.SETTINGS) },
+        onCreate = { title, questions, students, sets ->
+            vm.createExam(title, questions, students, sets) { id -> nav.popBackStack(); nav.navigate(Routes.exam(id)) }
+        },
     )
 }
 
-private data class Step(val title: String, val sub: String, val ok: Boolean, val cta: String, val go: () -> Unit)
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun NewExamContent(signedIn: Boolean, onBack: () -> Unit, onLecturer: () -> Unit, onCreate: (title: String, questions: Int, students: Int, sets: Int) -> Unit) {
+    var title by rememberSaveable { mutableStateOf("") }
+    var questions by rememberSaveable { mutableStateOf("30") }
+    var students by rememberSaveable { mutableStateOf("30") }
+    var sets by rememberSaveable { mutableIntStateOf(1) }
+    var tried by rememberSaveable { mutableStateOf(false) }
+    val q = questions.toIntOrNull()
+    val s = students.toIntOrNull()
+    val titleError = if (tried && title.isBlank()) "Give the exam a name" else null
+    val qError = if (q == null || q !in 1..100) "From 1 to 100" else null
+    val sError = if (s == null || s !in 1..999) "From 1 to 999" else null
+
+    Screen(
+        title = "New exam", onBack = onBack,
+        bottom = {
+            PrimaryButton("Create exam", {
+                tried = true
+                if (title.isNotBlank() && qError == null && sError == null) onCreate(title.trim(), q!!, s!!, sets)
+            })
+        },
+    ) {
+        item {
+            AppCard(onClick = onLecturer, padding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(BrandSoft), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.CloudDownload, contentDescription = null, tint = Brand)
+                    }
+                    Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                        Text("From Lecturer.bd", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                        Text(
+                            if (signedIn) "Pick a question paper. Its answer keys and students come with it." else "Sign in first, then pick one of your question papers.",
+                            fontSize = 14.sp, color = Muted,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Muted)
+                }
+            }
+        }
+        item { SectionTitle("Or make one here") }
+        item { Field(title, { title = it }, "Exam name", error = titleError) }
+        item {
+            Field(questions, { questions = it }, "Number of questions", number = true, error = if (tried || questions.isNotEmpty()) qError else null)
+            FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(20, 25, 30, 50, 100).forEach { v -> Chip("$v", q == v, { questions = "$v" }) }
+            }
+        }
+        item {
+            Field(
+                students, { students = it }, "Number of students", number = true,
+                error = if (tried || students.isNotEmpty()) sError else null,
+                hint = "Their rolls are 1, 2, 3… You can add names later.",
+            )
+        }
+        item {
+            Text("Question sets", fontSize = 16.sp, color = Ink, modifier = Modifier.padding(start = 4.dp))
+            Hint("Different versions of the paper, each with its own answer key.", Modifier.padding(top = 2.dp, bottom = 8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (1..4).forEach { v -> Chip("$v", sets == v, { sets = v }, Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+// ── One exam: three steps, then its results ─────────────────
 
 @Composable
-private fun StudentRow(initials: String, name: String, meta: String, flag: String?, score: String, nameColor: Color, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(36.dp).clip(CircleShape).background(SegBg), contentAlignment = Alignment.Center) { Text(initials, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = nameColor, maxLines = 1)
-            Text(meta, fontSize = 12.sp, fontFamily = Mono, color = Muted)
+fun ExamScreen(vm: AppViewModel, nav: NavController, id: Long) {
+    val b = rememberBundle(vm, id) ?: return
+    var uploading by remember { mutableStateOf(false) }
+    var summary by remember { mutableStateOf<String?>(null) }
+    ExamContent(
+        b, signedIn = vm.settings.lecturerSignedIn, uploading = uploading,
+        onBack = { nav.popBackStack() },
+        onSettings = { nav.navigate(Routes.examSettings(id)) },
+        onKey = { nav.navigate(Routes.key(id)) },
+        onPrint = { nav.navigate(Routes.print(id)) },
+        onScan = { nav.navigate(Routes.scan(id)) },
+        onSheet = { nav.navigate(Routes.review(id, it)) },
+        onAnalysis = { nav.navigate(Routes.analysis(id)) },
+        onShare = { vm.shareResults(b) },
+        onUpload = { if (!uploading) { uploading = true; vm.uploadResults(b) { s -> uploading = false; summary = s } } },
+        onSignIn = { nav.navigate(Routes.SETTINGS) },
+    )
+    summary?.let { text ->
+        AlertDialog(
+            onDismissRequest = { summary = null },
+            title = { Text("Lecturer.bd") },
+            text = { Text(text, fontSize = 15.sp) },
+            confirmButton = { TextButton(onClick = { summary = null }) { Text("OK", color = Brand, fontWeight = FontWeight.SemiBold) } },
+        )
+    }
+}
+
+@Composable
+fun ExamContent(
+    b: ExamBundle, signedIn: Boolean, uploading: Boolean,
+    onBack: () -> Unit, onSettings: () -> Unit, onKey: () -> Unit, onPrint: () -> Unit, onScan: () -> Unit,
+    onSheet: (Long) -> Unit, onAnalysis: () -> Unit, onShare: () -> Unit, onUpload: () -> Unit, onSignIn: () -> Unit,
+) {
+    var showMissing by rememberSaveable { mutableStateOf(false) }
+    val keyReady = !b.noKey && b.keyGaps.isEmpty()
+    val keyDetail = when {
+        b.noKey -> "Not added yet"
+        b.keyGaps.isNotEmpty() -> if (b.exam.setCode) "${plural(b.keyGaps.size, "set")} not finished" else "${b.keyDone(b.sets.first())} of ${b.n} answered"
+        b.exam.setCode -> "Done for all ${plural(b.sets.size, "set")}"
+        else -> "Done"
+    }
+    val scanDetail = if (b.sheets.isEmpty()) "After the exam, scan the filled sheets" else "${b.sheets.size} of ${b.total} scanned"
+    val toCheck = b.sheets.sortedBy { it.scannedAt }.firstOrNull { b.needsCheck(it) }
+
+    Screen(
+        title = b.exam.title, subtitle = b.meta(), onBack = onBack,
+        actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Exam settings", tint = Ink) } },
+        bottom = {
+            if (b.noKey) PrimaryButton("Add the answer key", onKey, icon = Icons.Outlined.Key)
+            else PrimaryButton(if (b.sheets.isEmpty()) "Scan sheets" else "Scan more sheets", onScan, icon = Icons.Outlined.PhotoCamera)
+        },
+    ) {
+        item {
+            AppCard {
+                StepRow(1, "Answer key", keyDetail, if (keyReady) StepState.DONE else StepState.TODO, onKey)
+                RowDivider()
+                StepRow(2, "Answer sheets", "Print one for each student", StepState.PLAIN, onPrint)
+                RowDivider()
+                StepRow(3, "Scan", scanDetail, if (b.sheets.isNotEmpty() && b.left == 0) StepState.DONE else StepState.PLAIN, onScan)
+            }
         }
-        if (flag != null) Box(Modifier.padding(end = 8.dp).clip(RoundedCornerShape(999.dp)).background(WarnBg).padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Text(flag, color = Warn, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        if (b.fromLecturer) item { LecturerCard(b, signedIn, uploading, onUpload, onSignIn) }
+
+        item { SectionTitle("Results", action = if (b.sheets.isNotEmpty()) "Share" else null, onAction = onShare) }
+        if (b.sheets.isEmpty()) {
+            item { Hint("Scanned sheets show up here, with each student's marks.") }
+        } else {
+            item { SummaryCard(b, onAnalysis) }
+            if (toCheck != null) item {
+                Banner(
+                    "${plural(b.reviewCount, "sheet")} need${if (b.reviewCount == 1) "s" else ""} a look before the marks are final.",
+                    action = "Check", onAction = { onSheet(toCheck.id) },
+                )
+            }
+            item { ResultsCard(b, onSheet) }
+            if (b.unmatched.isNotEmpty()) item { NotScannedCard(b, showMissing) { showMissing = !showMissing } }
         }
-        Text(score, fontFamily = Mono, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun SummaryCard(b: ExamBundle, onAnalysis: () -> Unit) {
+    val scores = b.scores
+    AppCard {
+        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+            Stat(b.average, "Average", Modifier.weight(1f))
+            Stat(scores.maxOrNull()?.let { "$it/${b.n}" } ?: "—", "Highest", Modifier.weight(1f))
+            Stat(scores.minOrNull()?.let { "$it/${b.n}" } ?: "—", "Lowest", Modifier.weight(1f))
+        }
+        RowDivider(0.dp)
+        SettingRow("Question analysis", "Which questions were hardest", onAnalysis)
+    }
+}
+
+@Composable
+fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Ink, maxLines = 1)
+        Text(label, fontSize = 13.sp, color = Muted)
+    }
+}
+
+@Composable
+private fun ResultsCard(b: ExamBundle, onSheet: (Long) -> Unit) {
+    val rows = remember(b) { b.sheets.sortedWith(compareByDescending<SheetEntity> { b.needsCheck(it) }.thenBy { it.roll }) }
+    AppCard {
+        rows.forEachIndexed { i, s ->
+            if (i > 0) RowDivider()
+            ResultRow(b, s) { onSheet(s.id) }
+        }
+    }
+}
+
+@Composable
+private fun ResultRow(b: ExamBundle, s: SheetEntity, onClick: () -> Unit) {
+    val known = b.student(s.roll) != null
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(b.nameOf(s), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (known) Ink else Warn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Roll ${s.roll.ifBlank { "—" }}" + if (b.exam.setCode) " · Set ${s.setCode}" else "", fontSize = 14.sp, color = Muted)
+        }
+        if (b.needsCheck(s)) Pill(b.flagText(s), Tone.WARN, Modifier.padding(horizontal = 8.dp))
+        Text(b.score(s)?.let { "$it/${b.n}" } ?: "—", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+    }
+}
+
+@Composable
+private fun NotScannedCard(b: ExamBundle, open: Boolean, onToggle: () -> Unit) {
+    AppCard {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onToggle).heightIn(min = 60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Not scanned yet", fontSize = 16.sp, color = Ink, modifier = Modifier.weight(1f))
+            Text("${b.unmatched.size}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Muted)
+            Icon(if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = if (open) "Hide" else "Show", tint = Muted, modifier = Modifier.padding(start = 8.dp))
+        }
+        if (open) b.unmatched.forEach { st ->
+            RowDivider()
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(st.name, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Roll ${st.roll}", fontSize = 14.sp, color = Muted)
+            }
+        }
+    }
+}
+
+/** On an exam from a Lecturer.bd paper: how many results are there, and sending the rest. */
+@Composable
+private fun LecturerCard(b: ExamBundle, signedIn: Boolean, uploading: Boolean, onUpload: () -> Unit, onSignIn: () -> Unit) {
+    val ready = b.toUpload.size
+    AppCard(padding = 16.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(CircleShape).background(BrandSoft), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.CloudUpload, contentDescription = null, tint = Brand)
+            }
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text("Lecturer.bd", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                Text(
+                    when {
+                        b.sheets.isEmpty() -> "The results go to this paper on Lecturer.bd."
+                        ready == 0 && b.reviewCount == 0 -> "All ${plural(b.uploadedCount, "result")} sent."
+                        ready == 0 -> "${b.uploadedCount} sent. Check the rest first."
+                        else -> "${b.uploadedCount} of ${b.sheets.size} sent."
+                    },
+                    fontSize = 14.sp, color = Muted,
+                )
+            }
+        }
+        when {
+            b.sheets.isEmpty() -> {}
+            !signedIn -> SecondaryButton("Sign in to send results", onSignIn, Modifier.fillMaxWidth().padding(top = 12.dp), color = Brand)
+            ready > 0 -> SecondaryButton(
+                if (uploading) "Sending…" else "Send ${plural(ready, "result")}", onUpload,
+                Modifier.fillMaxWidth().padding(top = 12.dp), enabled = !uploading, icon = Icons.Outlined.CloudUpload, color = Brand,
+            )
+        }
+    }
+}
+
+// ── Exam settings: name, class, students, marking, delete ───
+
+@Composable
+fun ExamSettingsScreen(vm: AppViewModel, nav: NavController, id: Long) {
+    val b = rememberBundle(vm, id) ?: return
+    ExamSettingsContent(
+        b,
+        onBack = { nav.popBackStack() },
+        onSave = { vm.updateExam(it) },
+        onStudents = { nav.navigate(Routes.students(id)) },
+        onDelete = { vm.deleteExam(id); nav.popBackStack(Routes.HOME, false) },
+    )
+}
+
+@Composable
+fun ExamSettingsContent(b: ExamBundle, onBack: () -> Unit, onSave: (ExamEntity) -> Unit, onStudents: () -> Unit, onDelete: () -> Unit) {
+    var dialog by remember { mutableStateOf<String?>(null) }
+    Screen(title = "Exam settings", subtitle = b.exam.title, onBack = onBack) {
+        item {
+            AppCard {
+                SettingRow("Exam name", b.exam.title, { dialog = "name" })
+                RowDivider()
+                SettingRow("Class", b.exam.className.ifBlank { "Not set" }, { dialog = "class" })
+                RowDivider()
+                SettingRow("Students", plural(b.total, "student") + if (b.fromLecturer) " · from Lecturer.bd" else " · add or change names", onStudents)
+            }
+        }
+        item { SectionTitle("Marking") }
+        item {
+            AppCard {
+                SettingRow(
+                    "Two answers on one question",
+                    if (b.exam.doubleRule == "wrong") "Counted wrong, as in board exams" else "I choose on each sheet",
+                    { dialog = "double" },
+                )
+            }
+        }
+        item { Hint("A much lighter second mark counts as rubbed out, so the darker one is marked. A question left blank gets 0.") }
+        item {
+            Spacer(Modifier.height(12.dp))
+            SecondaryButton("Delete exam", { dialog = "delete" }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Delete, color = Bad)
+        }
+    }
+    when (dialog) {
+        "name" -> TextDialog("Exam name", b.exam.title, { onSave(b.exam.copy(title = it)) }, { dialog = null }, note = "It's printed on the answer sheets.", check = { if (it.isBlank()) "Give the exam a name" else null })
+        "class" -> TextDialog("Class", b.exam.className, { onSave(b.exam.copy(className = it)) }, { dialog = null }, label = "For example: Class 10, Section B")
+        "double" -> ChoiceDialog(
+            "Two answers on one question",
+            listOf("wrong" to "Count it wrong (board rule)", "review" to "Let me choose on each sheet"),
+            b.exam.doubleRule, { onSave(b.exam.copy(doubleRule = it)) }, { dialog = null },
+        )
+        "delete" -> ConfirmDialog(
+            "Delete this exam?",
+            "Its answer keys, students and ${plural(b.sheets.size, "scanned sheet")} will be removed from this phone. This can't be undone.",
+            "Delete", onDelete, { dialog = null },
+        )
     }
 }
 
@@ -357,71 +480,35 @@ private fun StudentRow(initials: String, name: String, meta: String, flag: Strin
 @Composable
 fun StudentsScreen(vm: AppViewModel, nav: NavController, id: Long) {
     val b = rememberBundle(vm, id) ?: return
+    if (b.fromLecturer) {
+        Screen(title = "Students", subtitle = plural(b.total, "student"), onBack = { nav.popBackStack() }) {
+            item { Hint("These came with the paper from Lecturer.bd, with the rolls their sheets are read by.") }
+            item {
+                AppCard {
+                    b.students.forEachIndexed { i, st ->
+                        if (i > 0) RowDivider()
+                        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(st.name, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("Roll ${st.roll}", fontSize = 14.sp, color = Muted)
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     var text by rememberSaveable(b.exam.id) { mutableStateOf(b.students.joinToString("\n") { it.name }) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { BackBar(b.exam.title.substringBefore(" · "), { nav.popBackStack() }) }
-        item { ScreenTitle("Students", "One name per line, in roll order. Roll numbers are given automatically.") }
-        item {
-            OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 320.dp), label = { Text("${text.lines().count { it.isNotBlank() }} students") })
-            if (b.sheets.isNotEmpty()) Text("Scanned sheets keep the roll they were read with — re-check them after renumbering.", color = Warn, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-            Spacer(Modifier.height(16.dp))
-            PrimaryButton("Save list", {
-                val names = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    val names = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    Screen(
+        title = "Students", subtitle = plural(names.size, "student"), onBack = { nav.popBackStack() },
+        bottom = {
+            PrimaryButton("Save", {
                 if (names.isEmpty()) vm.toast("Add at least one student") else { vm.setStudents(b, names); nav.popBackStack() }
-            }, color = Ink, contentColor = Paper)
-        }
+            })
+        },
+    ) {
+        item { Hint("One name per line, in roll order: the first line is roll 1, the next is roll 2, and so on.") }
+        item { Field(text, { text = it }, "Names", singleLine = false, minHeight = 320.dp) }
+        if (b.sheets.isNotEmpty()) item { Banner("Sheets already scanned keep the roll they were read with.", Tone.WARN) }
     }
 }
-
-// ── Grading rules ───────────────────────────────────────────
-
-@Composable
-fun RulesScreen(vm: AppViewModel, nav: NavController, id: Long) {
-    val b = rememberBundle(vm, id) ?: return
-    val doubles = b.sheets.sumOf { com.omrscanner.app.omr.Grading.doubles(b.marks(it)) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { BackBar(b.exam.title.substringBefore(" · "), { nav.popBackStack() }) }
-        item { ScreenTitle("Grading rules", "How this exam treats marks the scanner can't take at face value.") }
-        item { SectionLabel("Answers") }
-        item {
-            AppCard(padding = PaddingValues(14.dp)) {
-                Text("Two bubbles filled on one question", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                Text(
-                    (if (b.exam.doubleRule == "wrong") "Counted as wrong — no marks, as in board exams." else "Sent to review — you pick the intended answer on each sheet.") +
-                        " $doubles on scanned sheets.",
-                    fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 3.dp, bottom = 10.dp),
-                )
-                Segmented(listOf("wrong" to "Count as wrong", "review" to "Send to review"), b.exam.doubleRule, { vm.updateExam(b.exam.copy(doubleRule = it)) })
-            }
-            Spacer(Modifier.height(10.dp))
-            AppCard {
-                InfoRow("Erased mark", "A mark much lighter than the other is treated as erased; the darker one is graded.", "under ${vm.settings.erasePct}%")
-                RowDivider()
-                InfoRow("Blank question", "Treated as unanswered. It scores 0 and doesn't hold the sheet for review.", "0 marks")
-                RowDivider()
-                InfoRow("Question with no key answer", "Not graded for any student until the key is filled in.", "skipped")
-            }
-        }
-        item { SectionLabel("Identity") }
-        item {
-            AppCard {
-                InfoRow("Roll not on the list, repeated, or double-filled", "The sheet is held until you match it to a student; likely rolls are suggested.", null)
-                RowDivider()
-                InfoRow("Set code unreadable or not in the key", "The sheet isn't graded until you choose a set; suggestions are ranked by the digits read and by score.", null)
-            }
-            Text("Scanner thresholds (erased-mark darkness, maximum tilt) apply to every exam — change them in Settings.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
-        }
-    }
-}
-
-@Composable
-private fun InfoRow(title: String, desc: String, value: String?) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-            Text(desc, fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 2.dp))
-        }
-        if (value != null) Text(value, fontFamily = Mono, fontSize = 12.sp, modifier = Modifier.padding(start = 10.dp).width(80.dp))
-    }
-}
-

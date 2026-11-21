@@ -1,6 +1,6 @@
 # OMR Scanner — Android app
 
-A native Android app for teachers. Design and print OMR (bubble) answer sheets, scan a stack of filled sheets with the phone camera, grade them against set-wise answer keys, review the few unclear sheets, and export results. It also includes a CamScanner-style document scanner for papers and ID cards with PDF export.
+A native Android app for teachers. Make an exam, print its OMR (bubble) answer sheets, then scan the filled sheets with the phone camera and get every student's marks. It works offline, and with [Lecturer.bd](https://lecturer-nine.vercel.app) it brings in your question papers and sends the results back. A document scanner for papers and ID cards is tucked into Settings.
 
 Kotlin · Jetpack Compose (Material 3) · CameraX · OpenCV 4.10 · Google ML Kit Document Scanner · Room · Retrofit
 
@@ -19,32 +19,38 @@ From the command line:
 ```bash
 ./gradlew assembleDebug          # → app/build/outputs/apk/debug/app-debug.apk
 ./gradlew installDebug           # install on a connected phone
-./gradlew test                   # unit tests
+./gradlew test                   # unit tests, and every screen drawn to a picture (below)
+./gradlew recordPaparazziDebug   # redraw the screen pictures in app/src/test/snapshots/images
 ```
 
-**No Android Studio? Let GitHub build it.** Push this folder to a GitHub repository (as the repository root). The included workflow `.github/workflows/build-apk.yml` builds the APK on GitHub's servers: open the **Actions** tab → the latest **Build APK** run → download **OMRScanner-apk** under *Artifacts*. Unzip it to get `app-debug.apk` and install it on your phone.
-
-For a release build, create a signing key (**Build → Generate Signed App Bundle / APK**) and run `./gradlew bundleRelease`.
-
-> This project was written without access to Google's Maven servers, so it has **not been compiled yet**. All sources pass a Kotlin syntax check, the grading and geometry logic is unit-tested, and the OMR algorithm was tested on synthetic photos (see `tools/`). The first Android Studio sync may still flag small API mismatches. They are usually one-line fixes that the IDE suggests.
+**No Android Studio? Let GitHub build it.** The workflow `.github/workflows/build-apk.yml` tests and builds a debug APK on every push to `main`: open the **Actions** tab → the latest **Build APK** run → download **OMRScanner-apk** under *Artifacts*. Signed releases come from a version tag (see [Releases](#releases)).
 
 ---
 
-## Features
+## How it works for the teacher
 
-### OMR grading
-| Screen | What it does |
-|---|---|
-| **Exams** | Lists exams with progress, a "needs your attention" list (missing answer keys, sheets to review), and **New exam**. |
-| **Exam hub** | Setup checklist (Students → Answer sheet → Answer key → Grading rules), scan button, results, and a To review / All scanned / Not yet list. Export CSV. |
-| **Answer sheet** | Questions (5–100), options (2–6), labels (A B C / ক খ গ / 1 2 3), English or Bangla, roll grid (0–8 digits), set-code grid, name fields. Live preview. **Print N copies** builds an A4 PDF to print or share. Structural settings lock once sheets are scanned. |
-| **Answer key** | Set-wise. **Enter manually** (tap the correct bubble; tap again to clear; add set codes) or **From database**: search the question bank and fetch every set at once (hundreds of sets supported). Checks that the paper fits the printed sheet. |
-| **Scanner** | CameraX preview. OpenCV finds the 4 corner squares, outlines the sheet live, estimates tilt, and refuses photos steeper than the limit (default 25°). It uses the orientation mark to read turned or upside-down sheets correctly, and captures automatically when steady (or with the shutter in manual mode). It waits for each sheet to leave the frame before reading the next, so you can flip through a stack. |
-| **Review** | Per-question marks with the correct answer ringed. Tap to override a mark. Fix a wrong, repeated or double-filled roll (likely students suggested), or an unreadable set code (suggestions ranked by the digits read, then by score). View the straightened scan, then approve. |
-| **Grading rules** | Two bubbles on one question: **count as wrong** (board rule) or **send to review**. Erased marks (much lighter than the darker one) are ignored. Blanks score 0. |
-| **Insights** | Mean, median, high, low, score distribution, and question analysis (hardest first, most common wrong option). |
+The app is built to be simple: no tabs, one exam at a time, and one big button at the bottom of each screen for the thing to do next.
 
-### Document scanner (Docs tab)
+1. **Home** lists the exams. Each card says in a few words how the exam stands ("Add the answer key", "3 sheets to check", "28 scanned · average 72%"). **New exam** is at the bottom; Settings is the gear.
+2. **New exam** asks only for a name, the number of questions, the number of students and the number of question sets. Or pick **From Lecturer.bd** to bring in a final question paper with its keys and students.
+3. **An exam** is three numbered steps, ticked off as they're done, with the results under them:
+   1. **Answer key**: tap the right answer for each question (one key per set; the chips at the top switch sets). Or fill every set from a question bank.
+   2. **Answer sheets**: a picture of the sheet, a few settings (questions, choices, language, roll digits, set code, school name), then **Print** (Android's print dialog, which can also save a PDF) or **Share** (to send to a print shop).
+   3. **Scan**: hold the phone over a sheet. It finds the four corner squares, reads the sheet by itself when steady (or press the round button), buzzes, shows the student's name and marks, then waits for the next sheet, so a stack goes quickly.
+4. **Results** list every student with their marks. Sheets that need a look come first, with the reason ("Check roll", "Check set", "Same roll"): the sheet screen shows each answer (the right one ringed in green), lets you tap a bubble to fix a misread mark, choose the right student or set, see the photo, or delete the sheet. **Share** sends a CSV; **Question analysis** shows the hardest questions and the spread of marks.
+5. **Exam settings** (the gear on an exam): its name and class, the students' names, what two answers on one question mean (counted wrong as in board exams, or your choice on each sheet), and deleting the exam.
+
+How a sheet is marked: two firm marks on one question count as wrong by default; a much lighter second mark counts as rubbed out; a blank question gets 0.
+
+### Screen pictures
+
+| Home | An exam | Scanning | Checking a sheet |
+|---|---|---|---|
+| ![Home](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_home_1-home.png) | ![An exam](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_examWithResults_3-exam.png) | ![Scanning](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_scanRead_6-scan-read.png) | ![Checking a sheet](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_sheetToCheck_7-sheet-check.png) |
+
+`app/src/test/java/com/omrscanner/app/ScreensTest.kt` draws every screen with sample exams on a 360 × 800 dp phone ([Paparazzi](https://github.com/cashapp/paparazzi), no phone or emulator needed). `gradlew recordPaparazziDebug` writes them to `app/src/test/snapshots/images`; the normal test run draws them too, so a screen that can't be drawn fails the build.
+
+### Document scanner (Settings → Scan documents)
 - **Scan document** opens Google's ML Kit scanner: live edge detection, auto-capture, crop handles, perspective correction and background removal, on-device.
 - **Scan ID card** captures the front and then the back, and puts both on **one A4 page at true card size** (85.6 × 54 mm), so a printout works as a photocopy.
 - **Document editor:** rename, add pages, add an ID card, reorder pages with ‹ ›, reverse the order, delete.
@@ -52,7 +58,7 @@ For a release build, create a signing key (**Build → Generate Signed App Bundl
 - **Export PDF:** page size (A4, Letter, Fit to scan), quality, page numbers. Then **Share**, or **Save** to `Downloads/OMR Scanner`.
 
 ### Settings
-Capture mode, maximum tilt, erased-mark threshold, question-bank server URL, and the school name printed on new sheets.
+The Lecturer.bd account, the school name printed on new sheets, and whether scanning takes the photo by itself. Under **Advanced**: the steepest angle a photo may be taken at (default 25°), how much lighter a mark must be to count as rubbed out (default 55%), and your own question-bank server.
 
 ---
 
@@ -92,7 +98,7 @@ All 7 scenarios read perfectly with the shipped thresholds. Change `FILLED`, `PR
 
 ## Question bank API
 
-With no server URL set, the app uses a built-in **sample bank**, so everything works offline. To use your own database, set **Settings → Question bank → Server URL** and implement:
+Answer keys can be filled from a question bank: your Lecturer.bd papers when signed in there, or your own server, set in **Settings → Advanced → Question bank server**, which implements:
 
 ```
 GET {url}/papers?q=physics
@@ -113,10 +119,10 @@ The client lives in `data/bank/QuestionBank.kt` (`RemoteQuestionBank`).
 
 Teachers on [Lecturer.bd](https://lecturer-nine.vercel.app) make their question papers there (sets shuffled from their question bank) and use this app to scan the answer sheets.
 
-1. **Settings → Lecturer.bd**: sign in with the same mobile number and password as on the website. The session token is kept in its own preferences file, left out of backups (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`). While signed in, the question bank is the teacher's final Lecturer.bd papers.
-2. **New exam → Import from Lecturer.bd**: pick a final paper. The exam comes set up: the answer sheet as Lecturer.bd lays it out (Bangla labels, roll digits, set-code grid), the students by roll, and every set's key. Importing the same paper again opens that exam.
-3. Print the sheets, scan them, review the unclear ones.
-4. **Upload results** on the exam's page sends the checked sheets Lecturer.bd doesn't have yet. Lecturer.bd marks each one again itself against its set's key (with its own negative marking) and answers sheet by sheet; refused ones (an unreadable roll, a set code not on the paper) are listed. A sheet changed in review afterwards is sent again with the next upload.
+1. **Settings** (the gear on Home) **→ Lecturer.bd**: sign in with the same mobile number and password as on the website. The session token is kept in its own preferences file, left out of backups (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`). While signed in, the question bank is the teacher's final Lecturer.bd papers.
+2. **New exam → From Lecturer.bd**: pick a final paper. The exam comes set up: the answer sheet as Lecturer.bd lays it out (Bangla labels, roll digits, set-code grid), the students by roll, and every set's key. Picking the same paper again opens that exam.
+3. Print the sheets, scan them, check the unclear ones.
+4. **Send results** on the exam's page sends the checked sheets Lecturer.bd doesn't have yet. Lecturer.bd marks each one again itself against its set's key (with its own negative marking) and answers sheet by sheet; refused ones (an unreadable roll, a set code not on the paper) are listed. A sheet changed afterwards is sent again with the next upload.
 
 The API (Lecturer.bd's `src/server/omr-api.ts`), always with `Authorization: Bearer <token>` after signing in:
 
@@ -163,14 +169,14 @@ app/src/main/java/com/omrscanner/app/
 │   ├── FileStore.kt          storage, share, save to Downloads
 │   └── AppSettings.kt
 └── ui/
-    ├── AppRoot.kt            navigation + bottom bar (Exams · Insights · Scan · Docs · Settings)
+    ├── AppRoot.kt            navigation, no tabs: Home → an exam → its steps; Settings behind the gear
     ├── AppViewModel.kt
-    ├── components/Common.kt  shared UI pieces
-    ├── theme/Theme.kt        warm paper + ink palette
-    ├── exams/                exams, hub, students, rules, sheet builder, answer key, review, insights
+    ├── components/Common.kt  the few pieces every screen is built from (screen, card, step, setting row, dialogs…)
+    ├── theme/Theme.kt        Lecturer.bd's palette: white cards, warm grey page, one green
+    ├── exams/                home, new exam, exam, exam settings, students, answer key, answer sheets, sheet check, analysis, Lecturer.bd papers
     ├── scan/OmrScanScreen.kt camera + live detection
     ├── docs/                 documents, ML Kit launcher, editor, page editor, export
-    └── settings/             settings, question bank browser
+    └── settings/             settings
 tools/omr_simulation.py       algorithm test bench (Python + OpenCV)
 ```
 

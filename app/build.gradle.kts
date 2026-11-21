@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    // Draws each screen to a PNG on the JVM (app/src/test/.../ScreensTest.kt), so the design can be seen without a phone.
+    alias(libs.plugins.paparazzi)
 }
 
 // The release key: from keystore.properties beside this project (never committed), or from the
@@ -23,8 +25,8 @@ android {
         applicationId = "com.omrscanner.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         vectorDrawables { useSupportLibrary = true }
     }
 

@@ -6,44 +6,43 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Warm paper + ink palette
-val Paper = Color(0xFFF6F4EF)
-val CardBg = Color(0xFFFFFEFB)
-val Ink = Color(0xFF1C1B19)
-val Muted = Color(0xFF6F6B64)
-val Faint = Color(0xFFA8A39A)
-val Line = Color(0xFFE6E2DA)
-val Divider = Color(0xFFEFECE5)
-val SegBg = Color(0xFFEBE8E1)
-val Accent = Color(0xFFF97316)
-val Good = Color(0xFF2F8F57)
-val GoodBg = Color(0xFFE6F4EA)
-val Warn = Color(0xFFB7791F)
-val WarnBg = Color(0xFFFBF2E1)
-val WarnLine = Color(0xFFEBD3A6)
-val Bad = Color(0xFFC0432F)
-val BadBg = Color(0xFFFBE9E5)
-val Teal = Color(0xFF1F6F6A)
-
-val Mono = FontFamily.Monospace
+// One calm palette, the same as Lecturer.bd's: white cards on a warm grey page, and one green for
+// what to do next. Every text colour reads at 4.5:1 or better on the page and on the cards.
+val PageBg = Color(0xFFF6F5F1)
+val CardBg = Color(0xFFFFFFFF)
+val InsetBg = Color(0xFFF1F0EB)
+val Ink = Color(0xFF17191C)
+val Muted = Color(0xFF5B6068)
+val Line = Color(0xFFE3E1DA)
+val FieldLine = Color(0xFFC9C6BC)
+val Brand = Color(0xFF0B6B4F)
+val BrandSoft = Color(0xFFE3F1EA)
+val Warn = Color(0xFF8A5300)
+val WarnSoft = Color(0xFFFFF3CC)
+val Bad = Color(0xFFB4361F)
+val BadSoft = Color(0xFFFCE8E4)
 
 private val scheme = lightColorScheme(
-    primary = Ink, onPrimary = Paper, secondary = Accent, onSecondary = Ink,
-    background = Paper, onBackground = Ink, surface = CardBg, onSurface = Ink,
-    surfaceVariant = SegBg, onSurfaceVariant = Muted, outline = Line, error = Bad,
+    primary = Brand, onPrimary = Color.White, primaryContainer = BrandSoft, onPrimaryContainer = Brand,
+    secondary = Brand, onSecondary = Color.White, tertiary = Brand,
+    background = PageBg, onBackground = Ink, surface = CardBg, onSurface = Ink,
+    surfaceVariant = InsetBg, onSurfaceVariant = Muted, outline = FieldLine, outlineVariant = Line,
+    surfaceContainerLowest = CardBg, surfaceContainerLow = CardBg, surfaceContainer = CardBg,
+    surfaceContainerHigh = CardBg, surfaceContainerHighest = CardBg, surfaceTint = Color.Transparent,
+    error = Bad, onError = Color.White,
 )
 
 private val type = Typography(
-    headlineLarge = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.8).sp),
-    headlineMedium = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.6).sp),
-    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
-    bodyMedium = TextStyle(fontSize = 14.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, color = Muted),
-    labelSmall = TextStyle(fontSize = 11.sp, fontFamily = Mono, letterSpacing = 1.2.sp),
+    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 26.sp),
+    titleMedium = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontSize = 15.sp, lineHeight = 21.sp),
+    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, color = Muted),
+    labelLarge = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
 )
 
 @Composable

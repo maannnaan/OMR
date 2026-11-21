@@ -52,12 +52,16 @@ data class ExamBundle(
     val unmatched get() = students.filter { st -> sheets.none { it.roll == st.roll } }
     val left get() = (total - sheets.size).coerceAtLeast(0)
 
+    /** What to look at on a sheet that needs the teacher, in a word or two. */
     fun flagText(s: SheetEntity): String = when (idIssue(s)) {
         IdIssue.SET -> "Check set"
-        IdIssue.ROLL_MISSING -> if (s.roll.contains('?') && s.rollAlt.isNotEmpty()) "Roll double" else "Check roll"
-        IdIssue.ROLL_DUP -> "Check roll"
-        null -> "${Grading.issues(marks(s), exam.doubleRule)} to check"
+        IdIssue.ROLL_MISSING -> "Check roll"
+        IdIssue.ROLL_DUP -> "Same roll"
+        null -> "Check answers"
     }
+
+    /** The marks of the scanned sheets that could be marked. */
+    val scores: List<Int> get() = sheets.mapNotNull { score(it) }
 
     /** Whether this exam came from a Lecturer.bd paper, so its results can go back there. */
     val fromLecturer: Boolean get() = exam.remotePaperId != null

@@ -6,10 +6,19 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
 /** App-private storage for scans, plus sharing and saving to Downloads. */
@@ -50,6 +59,29 @@ class FileStore(private val context: Context) {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         runCatching { context.startActivity(view) }
+    }
+
+    /**
+     * Opens Android's print dialog for a PDF: the teacher picks a printer (or "Save as PDF") and the
+     * copies. Needs an activity's context, as Android only prints from one.
+     */
+    fun print(activity: Context, file: File, jobName: String) {
+        val manager = activity.getSystemService(Context.PRINT_SERVICE) as PrintManager
+        manager.print(jobName, object : PrintDocumentAdapter() {
+            override fun onLayout(old: PrintAttributes?, new: PrintAttributes, cancel: CancellationSignal?, callback: PrintDocumentAdapter.LayoutResultCallback, extras: Bundle?) {
+                if (cancel?.isCanceled == true) { callback.onLayoutCancelled(); return }
+                callback.onLayoutFinished(PrintDocumentInfo.Builder(file.name).setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true)
+            }
+
+            override fun onWrite(pages: Array<out PageRange>, destination: ParcelFileDescriptor, cancel: CancellationSignal?, callback: PrintDocumentAdapter.WriteResultCallback) {
+                try {
+                    file.inputStream().use { input -> FileOutputStream(destination.fileDescriptor).use { input.copyTo(it) } }
+                    callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+                } catch (e: Exception) {
+                    callback.onWriteFailed(e.message)
+                }
+            }
+        }, PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build())
     }
 
     /** Copies a file into the public Downloads folder. Returns a short description of where it went. */

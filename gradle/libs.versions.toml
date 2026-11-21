@@ -14,6 +14,8 @@ mlkitDocScanner = "16.0.0-beta1"
 retrofit = "2.11.0"
 coroutines = "1.8.1"
 junit = "4.13.2"
+# 1.3.4, not 1.3.5: 1.3.5's plugin pulls the Kotlin Gradle plugin up to 2.0.21, past what ksp above supports
+paparazzi = "1.3.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,3 +52,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+paparazzi = { id = "app.cash.paparazzi", version.ref = "paparazzi" }

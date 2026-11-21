@@ -52,15 +52,15 @@ class AppContainer(context: Context) {
             else -> SampleQuestionBank
         }
 
-    /** First launch: one ready-to-scan exam so the app isn't empty. */
+    /** First launch: one sample exam, ready to print and scan, so the app isn't empty. */
     suspend fun seedIfEmpty() {
         if (!exams.isEmpty()) return
-        val names = listOf("Aditi Sharma", "Rohan Mehta", "Kavya Iyer", "Arjun Nair", "Meera Pillai", "Ishaan Gupta", "Sara Khan", "Vikram Rao",
-            "Ananya Das", "Kabir Singh", "Nisha Verma", "Dev Patel", "Tara Joshi", "Yash Malhotra", "Riya Kapoor", "Aman Bhatt", "Zoya Ali",
-            "Neel Desai", "Pooja Reddy", "Karan Sethi", "Leela Menon", "Omar Shaikh", "Diya Bose", "Farhan Qureshi", "Ira Chawla", "Manav Jain",
-            "Sana Mirza", "Tejas Kulkarni")
+        val names = listOf("Rahim Uddin", "Fatema Akter", "Tanvir Hasan", "Nusrat Jahan", "Sakib Hossain", "Maliha Rahman", "Arif Chowdhury",
+            "Sumaiya Islam", "Imran Kabir", "Tasnim Ahmed", "Rafiq Mia", "Jannatul Ferdous", "Mahmud Hasan", "Sadia Afrin", "Nayeem Khan",
+            "Farhana Yasmin", "Shakil Ahmed", "Mithila Das", "Rakib Hasan", "Sharmin Sultana", "Ashik Rahman", "Lamia Haque", "Tahsin Alam",
+            "Rubaiya Karim", "Fahim Shahriar", "Anika Tabassum", "Zubair Hossain", "Puja Saha")
         val id = exams.create(
-            ExamEntity(title = "Physics · Unit 3 Quiz", className = "Grade 10 · Section B", date = "Nov 6", questions = 30, options = 4, rollDigits = 3, setCode = true),
+            ExamEntity(title = "Sample exam · Physics", className = "Class 10", date = "", questions = 30, options = 4, rollDigits = 3, setCode = true),
             names,
         )
         var s = 7L

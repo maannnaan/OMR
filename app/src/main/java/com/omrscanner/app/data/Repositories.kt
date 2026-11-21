@@ -29,10 +29,12 @@ class ExamRepository(private val db: AppDatabase, private val files: FileStore) 
         exams.map { e -> ExamBundle(e, students.filter { it.examId == e.id }, keys.filter { it.examId == e.id }, sheets.filter { it.examId == e.id }) }
     }
 
-    suspend fun create(exam: ExamEntity, names: List<String>): Long {
+    /** A new exam with its students, and an empty key for each of [sets] (or the one key, without set codes). */
+    suspend fun create(exam: ExamEntity, names: List<String>, sets: List<String> = emptyList()): Long {
         val id = dao.insertExam(exam)
         setStudents(id, exam.rollDigits, names)
-        if (!exam.setCode) dao.upsertKeys(listOf(AnswerKeyEntity(id, NO_SET, KeyCodec.encode(KeyCodec.blank(exam.questions)))))
+        val blank = KeyCodec.encode(KeyCodec.blank(exam.questions))
+        dao.upsertKeys(if (exam.setCode) sets.map { AnswerKeyEntity(id, it, blank) } else listOf(AnswerKeyEntity(id, NO_SET, blank)))
         return id
     }
 
@@ -50,9 +52,27 @@ class ExamRepository(private val db: AppDatabase, private val files: FileStore) 
             val keys = dao.keysFor(exam.id).map { it.copy(answers = KeyCodec.encode(KeyCodec.fit(KeyCodec.decode(it.answers), exam.questions, exam.options)), source = null) }
             dao.upsertKeys(keys)
         }
+        // Set codes on or off: the first set's answers carry over as the one key (or as set 101).
         if (old != null && old.setCode != exam.setCode) {
+            val first = dao.keysFor(exam.id).sortedWith(compareBy({ it.setCode.length }, { it.setCode })).firstOrNull()
             dao.clearKeys(exam.id)
-            if (!exam.setCode) dao.upsertKeys(listOf(AnswerKeyEntity(exam.id, NO_SET, KeyCodec.encode(KeyCodec.blank(exam.questions)))))
+            dao.upsertKeys(
+                listOf(
+                    AnswerKeyEntity(
+                        exam.id, if (exam.setCode) "101" else NO_SET,
+                        first?.answers ?: KeyCodec.encode(KeyCodec.blank(exam.questions)), first?.source, first?.edited ?: false,
+                    ),
+                ),
+            )
+        }
+        // A roll grid with more or fewer digits: the rolls are written to match it ("7" → "007").
+        if (old != null && old.rollDigits != exam.rollDigits && exam.rollDigits > 0) {
+            val students = dao.studentsFor(exam.id)
+            val rolls = students.map { it.roll.trimStart('0').ifEmpty { "0" } }
+            if (rolls.all { r -> r.all(Char::isDigit) && r.length <= exam.rollDigits }) {
+                dao.clearStudents(exam.id)
+                dao.insertStudents(students.zip(rolls) { s, r -> s.copy(id = 0, roll = r.padStart(exam.rollDigits, '0')) })
+            }
         }
     }
 

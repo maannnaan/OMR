@@ -1,202 +1,185 @@
 package com.omrscanner.app.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.omrscanner.app.data.bank.PaperSummary
 import com.omrscanner.app.ui.AppViewModel
 import com.omrscanner.app.ui.Routes
 import com.omrscanner.app.ui.components.AppCard
-import com.omrscanner.app.ui.components.BackBar
+import com.omrscanner.app.ui.components.ChoiceDialog
+import com.omrscanner.app.ui.components.Field
+import com.omrscanner.app.ui.components.Hint
 import com.omrscanner.app.ui.components.PrimaryButton
 import com.omrscanner.app.ui.components.RowDivider
+import com.omrscanner.app.ui.components.Screen
 import com.omrscanner.app.ui.components.SecondaryButton
-import com.omrscanner.app.ui.components.SectionLabel
-import com.omrscanner.app.ui.components.Segmented
-import com.omrscanner.app.ui.components.Stepper
-import com.omrscanner.app.ui.theme.Faint
-import com.omrscanner.app.ui.theme.Good
+import com.omrscanner.app.ui.components.SectionTitle
+import com.omrscanner.app.ui.components.SettingRow
+import com.omrscanner.app.ui.components.SwitchRow
+import com.omrscanner.app.ui.components.TextDialog
+import com.omrscanner.app.ui.components.fieldColors
+import com.omrscanner.app.ui.theme.Brand
+import com.omrscanner.app.ui.theme.BrandSoft
 import com.omrscanner.app.ui.theme.Ink
-import com.omrscanner.app.ui.theme.Mono
 import com.omrscanner.app.ui.theme.Muted
-import com.omrscanner.app.ui.theme.Paper
-import com.omrscanner.app.ui.theme.SegBg
-import kotlinx.coroutines.delay
+
+/** Everything the Settings screen shows, so it can be drawn without the phone's stored settings. */
+data class SettingsState(
+    val signedIn: Boolean,
+    val lecturerName: String,
+    val lecturerUrl: String,
+    val school: String,
+    val autoCapture: Boolean,
+    val maxTilt: Int,
+    val erasePct: Int,
+    val bankUrl: String,
+    val version: String,
+)
 
 @Composable
 fun SettingsScreen(vm: AppViewModel, nav: NavController) {
     val s = vm.settings
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp)) {
-        item { Text("Settings", fontSize = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.8).sp) }
-        item { SectionLabel("OMR scanner") }
+    val ctx = LocalContext.current
+    val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty() }
+    var signingIn by remember { mutableStateOf(false) }
+    SettingsContent(
+        SettingsState(s.lecturerSignedIn, s.lecturerName, s.lecturerUrl, s.schoolName, s.autoCapture, s.maxTilt, s.erasePct, s.bankUrl, version),
+        signingIn = signingIn,
+        onBack = { nav.popBackStack() },
+        onSignIn = { id, password, done -> signingIn = true; vm.lecturerSignIn(id, password) { ok -> signingIn = false; done(ok) } },
+        onSignOut = { vm.lecturerSignOut() },
+        onLecturerUrl = { s.lecturerUrl = it },
+        onSchool = { s.schoolName = it },
+        onAutoCapture = { s.autoCapture = it },
+        onMaxTilt = { s.maxTilt = it },
+        onErasePct = { s.erasePct = it },
+        onBankUrl = { s.bankUrl = it },
+        onDocs = { nav.navigate(Routes.DOCS) },
+    )
+}
+
+@Composable
+fun SettingsContent(
+    state: SettingsState, signingIn: Boolean,
+    onBack: () -> Unit, onSignIn: (identifier: String, password: String, done: (Boolean) -> Unit) -> Unit, onSignOut: () -> Unit,
+    onLecturerUrl: (String) -> Unit, onSchool: (String) -> Unit, onAutoCapture: (Boolean) -> Unit,
+    onMaxTilt: (Int) -> Unit, onErasePct: (Int) -> Unit, onBankUrl: (String) -> Unit, onDocs: () -> Unit,
+) {
+    var dialog by remember { mutableStateOf<String?>(null) }
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    Screen(title = "Settings", onBack = onBack) {
+        item { SectionTitle("Lecturer.bd") }
+        item { LecturerAccount(state, signingIn, onSignIn, onSignOut) { dialog = "server" } }
+
+        item { SectionTitle("Answer sheets") }
+        item { AppCard { SettingRow("School name", state.school.ifBlank { "Not set" }, { dialog = "school" }) } }
+        item { Hint("Printed at the top of new answer sheets.") }
+
+        item { SectionTitle("Scanning") }
         item {
             AppCard {
-                Column(Modifier.padding(14.dp)) {
-                    Text("Capture", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                    Text(if (s.autoCapture) "Captures on its own once the 4 corners are steady." else "You press the shutter when the corners turn green.", fontSize = 12.sp, color = Muted)
-                    Segmented(listOf(true to "Automatic", false to "Shutter button"), s.autoCapture, { s.autoCapture = it }, Modifier.padding(top = 10.dp))
-                }
-                RowDivider()
-                SettingStepper("Maximum tilt", "Steeper photos are refused and the teacher is asked to hold the phone flatter.", "${s.maxTilt}°", { s.maxTilt -= 5 }, { s.maxTilt += 5 })
-                RowDivider()
-                SettingStepper("Erased-mark threshold", "A second mark lighter than this share of the darker one counts as erased.", "${s.erasePct}%", { s.erasePct -= 5 }, { s.erasePct += 5 })
+                SwitchRow("Scan by itself", if (state.autoCapture) "Takes the photo as soon as the sheet is steady" else "You tap the round button for each sheet", state.autoCapture, onAutoCapture)
             }
         }
-        item { SectionLabel("Lecturer.bd") }
-        item { LecturerCard(vm) }
-        item { SectionLabel("Question bank") }
+
+        item { SectionTitle("More") }
         item {
             AppCard {
-                Column(Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(5.dp)).background(Good).padding(5.dp))
-                        Text(
-                            when {
-                                s.lecturerSignedIn -> "Using your Lecturer.bd papers"
-                                s.bankUrl.isBlank() -> "Using the built-in sample bank"
-                                else -> "Connected to your server"
-                            },
-                            fontWeight = FontWeight.Medium, fontSize = 15.sp,
-                        )
-                    }
-                    if (!s.lecturerSignedIn) {
-                        var url by rememberSaveable { mutableStateOf(s.bankUrl) }
-                        OutlinedTextField(url, { url = it; s.bankUrl = it }, label = { Text("Server URL (optional)") }, placeholder = { Text("https://school.example/api/") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-                        Text("Answer keys are fetched from GET {url}/papers and {url}/papers/{id}. See README.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
-                    }
-                }
+                SettingRow("Scan documents", "Papers and ID cards, saved as PDF", onDocs)
                 RowDivider()
-                Row(Modifier.fillMaxWidth().clickable { nav.navigate(Routes.BANK) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Browse question bank", fontWeight = FontWeight.Medium, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text("›", color = Faint, fontSize = 18.sp)
+                SettingRow("Advanced", if (advanced) "Hide" else "Scanner limits and your own question bank", { advanced = !advanced })
+                if (advanced) {
+                    RowDivider()
+                    SettingRow("Steepest angle", "${state.maxTilt}°: steeper photos are refused", { dialog = "tilt" })
+                    RowDivider()
+                    SettingRow("Rubbed-out marks", "A mark lighter than ${state.erasePct}% of the darkest one is ignored", { dialog = "erase" })
+                    if (!state.signedIn) {
+                        RowDivider()
+                        SettingRow("Question bank server", state.bankUrl.ifBlank { "Not set" }, { dialog = "bank" })
+                    }
                 }
             }
         }
-        item { SectionLabel("School") }
         item {
-            AppCard(padding = PaddingValues(14.dp)) {
-                var school by rememberSaveable { mutableStateOf(s.schoolName) }
-                Text("Printed on new answer sheets", fontSize = 12.sp, color = Muted)
-                OutlinedTextField(school, { school = it; s.schoolName = it }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
-            }
-            Text("OMR Scanner · version 1.1", fontSize = 12.sp, color = Faint, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(
+                "OMR Scanner ${state.version}", fontSize = 13.sp, color = Muted, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            )
         }
+    }
+
+    when (dialog) {
+        "server" -> TextDialog("Lecturer.bd address", state.lecturerUrl, onLecturerUrl, { dialog = null }, note = "Only change this if you were told to.")
+        "school" -> TextDialog("School name", state.school, onSchool, { dialog = null }, note = "Printed at the top of new answer sheets.")
+        "tilt" -> ChoiceDialog("Steepest angle", (10..40 step 5).map { it to "$it°" + if (it == 25) " (usual)" else "" }, state.maxTilt, onMaxTilt, { dialog = null }, note = "Photos taken at a steeper angle are refused, because the bubbles look squashed.")
+        "erase" -> ChoiceDialog("Rubbed-out marks", (30..80 step 5).map { it to "$it%" + if (it == 55) " (usual)" else "" }, state.erasePct, onErasePct, { dialog = null }, note = "When a question has two marks and one is this much lighter, it counts as rubbed out.")
+        "bank" -> TextDialog("Question bank server", state.bankUrl, onBankUrl, { dialog = null }, label = "https://…", note = "Your own server with answer keys (see the README). Leave empty if you don't have one.")
     }
 }
 
 /** Signing in to Lecturer.bd with the teacher's own mobile number and password, or out again. */
 @Composable
-private fun LecturerCard(vm: AppViewModel) {
-    val s = vm.settings
-    AppCard(padding = PaddingValues(14.dp)) {
-        if (s.lecturerSignedIn) {
+private fun LecturerAccount(state: SettingsState, signingIn: Boolean, onSignIn: (String, String, (Boolean) -> Unit) -> Unit, onSignOut: () -> Unit, onServer: () -> Unit) {
+    AppCard(padding = 16.dp) {
+        if (state.signedIn) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(5.dp)).background(Good).padding(5.dp))
-                Text("Signed in as ${s.lecturerName}", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Box(Modifier.size(44.dp).clip(CircleShape).background(BrandSoft), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Check, contentDescription = null, tint = Brand)
+                }
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                    Text("Signed in", fontSize = 14.sp, color = Muted)
+                    Text(state.lecturerName, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                }
             }
-            Text("Your final question papers are the question bank. Import one as an exam from New exam, and upload its results from the exam's page.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
-            SecondaryButton("Sign out", { vm.lecturerSignOut() }, Modifier.padding(top = 10.dp))
+            Text("Your question papers are under New exam → From Lecturer.bd.", fontSize = 14.sp, color = Muted, modifier = Modifier.padding(top = 12.dp))
+            SecondaryButton("Sign out", onSignOut, Modifier.fillMaxWidth().padding(top = 12.dp))
         } else {
             var identifier by rememberSaveable { mutableStateOf("") }
             var password by remember { mutableStateOf("") }
-            var busy by remember { mutableStateOf(false) }
-            var changeServer by rememberSaveable { mutableStateOf(false) }
-            Text("Sign in with your Lecturer.bd mobile number and password to bring in your question papers and send results back.", fontSize = 13.sp, color = Muted)
+            Text("Sign in with your Lecturer.bd mobile number and password to use your question papers and send results back.", fontSize = 15.sp, color = Muted)
+            Field(identifier, { identifier = it }, "Mobile number or email", Modifier.padding(top = 12.dp))
             OutlinedTextField(
-                identifier, { identifier = it }, label = { Text("Mobile number or email") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            )
-            OutlinedTextField(
-                password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true,
+                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                colors = fieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             )
             PrimaryButton(
-                if (busy) "Signing in…" else "Sign in",
-                {
-                    if (identifier.isBlank() || password.isEmpty()) vm.toast("Enter your mobile number and password")
-                    else if (!busy) { busy = true; vm.lecturerSignIn(identifier, password) { ok -> busy = false; if (ok) password = "" } }
-                },
-                Modifier.padding(top = 12.dp), color = Ink, contentColor = Paper, enabled = !busy,
+                if (signingIn) "Signing in…" else "Sign in",
+                { if (identifier.isNotBlank() && password.isNotEmpty() && !signingIn) onSignIn(identifier, password) { ok -> if (ok) password = "" } },
+                Modifier.padding(top = 16.dp), enabled = !signingIn && identifier.isNotBlank() && password.isNotEmpty(),
             )
-            if (changeServer) {
-                var url by rememberSaveable { mutableStateOf(s.lecturerUrl) }
-                OutlinedTextField(url, { url = it; s.lecturerUrl = it }, label = { Text("Lecturer.bd address") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-            } else {
-                Text(
-                    "Server: ${s.lecturerUrl.removePrefix("https://")} · change", fontSize = 12.sp, color = Faint,
-                    modifier = Modifier.padding(top = 10.dp).clickable { changeServer = true },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingStepper(title: String, desc: String, value: String, dec: () -> Unit, inc: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-            Text(desc, fontSize = 12.sp, color = Muted)
-        }
-        Stepper(value, dec, inc)
-    }
-}
-
-@Composable
-fun QuestionBankScreen(vm: AppViewModel, nav: NavController) {
-    val exams by vm.bundles.collectAsStateWithLifecycle()
-    var q by rememberSaveable { mutableStateOf("") }
-    val results by produceState<List<PaperSummary>?>(null, q) { delay(250); value = runCatching { vm.searchBank(q) }.getOrElse { vm.toast("Question bank unreachable: ${it.message}"); emptyList() } }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { BackBar("Settings", { nav.popBackStack() }) }
-        item {
-            Text("Question bank", fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
-            OutlinedTextField(q, { q = it }, label = { Text("Search by title, subject or code") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp))
-        }
-        val list = results
-        if (list == null) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Ink) } }
-        else items(list) { p ->
-            val match = exams.firstOrNull { it.n == p.questions && it.exam.options == p.options }
-            AppCard(Modifier.padding(bottom = 10.dp).clickable { match?.let { nav.navigate(Routes.key(it.exam.id)) } ?: vm.toast("No exam uses a ${p.questions} × ${p.options} sheet yet") }, padding = PaddingValues(14.dp)) {
-                Row {
-                    Text(p.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                    Text(p.code, fontFamily = Mono, fontSize = 11.sp, color = Muted, modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(SegBg).padding(horizontal = 6.dp, vertical = 3.dp))
-                }
-                Text("${p.questions} Q · ${p.options} options · ${p.setCount} set${if (p.setCount > 1) "s" else ""} (${p.firstSet}–${p.lastSet})", fontFamily = Mono, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-                Row(Modifier.padding(top = 6.dp)) {
-                    Text("Updated ${p.updated} · ${p.author}", fontSize = 12.sp, color = Muted, modifier = Modifier.weight(1f))
-                    Text(match?.let { "Use for ${it.exam.title.substringBefore(" · ")} ›" } ?: "No matching exam", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (match != null) Ink else Faint)
-                }
+            TextButton(onClick = onServer, modifier = Modifier.padding(top = 4.dp)) {
+                Text("Server: ${state.lecturerUrl.removePrefix("https://")}", fontSize = 13.sp, color = Muted)
             }
         }
     }

@@ -21,6 +21,7 @@ interface ExamDao {
     @Update suspend fun updateExam(e: ExamEntity)
     @Query("DELETE FROM exams WHERE id = :id") suspend fun deleteExam(id: Long)
 
+    @Query("SELECT * FROM students WHERE examId = :examId ORDER BY roll") suspend fun studentsFor(examId: Long): List<StudentEntity>
     @Insert suspend fun insertStudents(s: List<StudentEntity>)
     @Query("DELETE FROM students WHERE examId = :examId") suspend fun clearStudents(examId: Long)
 
