@@ -35,7 +35,7 @@ import com.omrscanner.app.ui.theme.PageBg
 
 /**
  * Where everything is. There are no tabs: Home lists the exams, each exam is three steps (answer key,
- * answer sheets, scan) with its results under them, and Settings sits behind the gear on Home.
+ * OMR sheets, scan) with its results under them, and Settings sits behind the gear on Home.
  */
 object Routes {
     const val HOME = "home"

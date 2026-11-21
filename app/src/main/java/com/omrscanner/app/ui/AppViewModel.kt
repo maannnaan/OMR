@@ -167,9 +167,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun shareResults(b: ExamBundle) = io { files.share(c.exams.exportCsv(b), "text/csv", "Share results") }
 
-    /** The printable answer sheets, one A4 page per student, then [then] with the PDF. */
+    /** The printable OMR sheets, one A4 page per student, then [then] with the PDF. */
     private fun sheetPdf(exam: ExamEntity, copies: Int, then: (File) -> Unit) = io {
-        val f = files.exportFile("${exam.title} - answer sheets.pdf")
+        val f = files.exportFile("${exam.title} - OMR sheets.pdf")
         withContext(Dispatchers.Default) { SheetPdf.write(exam.layout(), copies.coerceAtLeast(1), f) }
         then(f)
     }
@@ -178,7 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun printSheets(activity: android.content.Context, b: ExamBundle) = sheetPdf(b.exam, b.total) { files.print(activity, it, b.exam.title) }
 
     /** The sheets as a PDF to send on, e.g. to a print shop. */
-    fun shareSheets(b: ExamBundle) = sheetPdf(b.exam, b.total) { files.share(it, "application/pdf", "Send the answer sheets") }
+    fun shareSheets(b: ExamBundle) = sheetPdf(b.exam, b.total) { files.share(it, "application/pdf", "Send the OMR sheets") }
 
     // ── documents ───────────────────────────────────────────
     fun importScan(uris: List<Uri>, idCard: Boolean, intoDoc: Long?, opened: (Long) -> Unit) = io {

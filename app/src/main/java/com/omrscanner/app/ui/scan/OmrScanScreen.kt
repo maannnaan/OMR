@@ -216,7 +216,7 @@ fun OmrScanScreen(vm: AppViewModel, nav: NavController, examId: Long) {
     if (!granted) {
         Column(Modifier.fillMaxSize().background(Ink).statusBarsPadding().navigationBarsPadding().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
-            Text("The camera is needed to scan answer sheets.", color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp, bottom = 24.dp))
+            Text("The camera is needed to scan OMR sheets.", color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp, bottom = 24.dp))
             PrimaryButton("Allow the camera", { askPermission.launch(Manifest.permission.CAMERA) })
             TextButton(onClick = { nav.popBackStack() }, modifier = Modifier.padding(top = 8.dp)) { Text("Back", color = Color.White, fontSize = 16.sp) }
         }

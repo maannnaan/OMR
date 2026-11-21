@@ -129,7 +129,7 @@ fun ExamsContent(bundles: List<ExamBundle>, onOpen: (Long) -> Unit, onNew: () ->
         bottom = { PrimaryButton("New exam", onNew, icon = Icons.Outlined.Add) },
     ) {
         if (bundles.isEmpty()) item {
-            EmptyState(Icons.Outlined.Quiz, "No exams yet", "Make an exam, print its answer sheets, then scan them after the test.")
+            EmptyState(Icons.Outlined.Quiz, "No exams yet", "Make an exam, print its OMR sheets, then scan them after the test.")
         }
         items(bundles, key = { it.exam.id }) { b -> ExamCard(b) { onOpen(b.exam.id) } }
     }
@@ -292,7 +292,7 @@ fun ExamContent(
             AppCard {
                 StepRow(1, "Answer key", keyDetail, if (keyReady) StepState.DONE else StepState.TODO, onKey)
                 RowDivider()
-                StepRow(2, "Answer sheets", "Print one for each student", StepState.PLAIN, onPrint)
+                StepRow(2, "OMR sheets", "Make and print one for each student", StepState.PLAIN, onPrint)
                 RowDivider()
                 StepRow(3, "Scan", scanDetail, if (b.sheets.isNotEmpty() && b.left == 0) StepState.DONE else StepState.PLAIN, onScan)
             }
@@ -460,7 +460,7 @@ fun ExamSettingsContent(b: ExamBundle, onBack: () -> Unit, onSave: (ExamEntity) 
         }
     }
     when (dialog) {
-        "name" -> TextDialog("Exam name", b.exam.title, { onSave(b.exam.copy(title = it)) }, { dialog = null }, note = "It's printed on the answer sheets.", check = { if (it.isBlank()) "Give the exam a name" else null })
+        "name" -> TextDialog("Exam name", b.exam.title, { onSave(b.exam.copy(title = it)) }, { dialog = null }, note = "It's printed on the OMR sheets.", check = { if (it.isBlank()) "Give the exam a name" else null })
         "class" -> TextDialog("Class", b.exam.className, { onSave(b.exam.copy(className = it)) }, { dialog = null }, label = "For example: Class 10, Section B")
         "double" -> ChoiceDialog(
             "Two answers on one question",

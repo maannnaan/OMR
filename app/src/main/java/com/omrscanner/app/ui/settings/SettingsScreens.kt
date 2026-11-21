@@ -101,9 +101,9 @@ fun SettingsContent(
         item { SectionTitle("Lecturer.bd") }
         item { LecturerAccount(state, signingIn, onSignIn, onSignOut) { dialog = "server" } }
 
-        item { SectionTitle("Answer sheets") }
+        item { SectionTitle("OMR sheets") }
         item { AppCard { SettingRow("School name", state.school.ifBlank { "Not set" }, { dialog = "school" }) } }
-        item { Hint("Printed at the top of new answer sheets.") }
+        item { Hint("Printed at the top of new OMR sheets.") }
 
         item { SectionTitle("Scanning") }
         item {
@@ -140,7 +140,7 @@ fun SettingsContent(
 
     when (dialog) {
         "server" -> TextDialog("Lecturer.bd address", state.lecturerUrl, onLecturerUrl, { dialog = null }, note = "Only change this if you were told to.")
-        "school" -> TextDialog("School name", state.school, onSchool, { dialog = null }, note = "Printed at the top of new answer sheets.")
+        "school" -> TextDialog("School name", state.school, onSchool, { dialog = null }, note = "Printed at the top of new OMR sheets.")
         "tilt" -> ChoiceDialog("Steepest angle", (10..40 step 5).map { it to "$it°" + if (it == 25) " (usual)" else "" }, state.maxTilt, onMaxTilt, { dialog = null }, note = "Photos taken at a steeper angle are refused, because the bubbles look squashed.")
         "erase" -> ChoiceDialog("Rubbed-out marks", (30..80 step 5).map { it to "$it%" + if (it == 55) " (usual)" else "" }, state.erasePct, onErasePct, { dialog = null }, note = "When a question has two marks and one is this much lighter, it counts as rubbed out.")
         "bank" -> TextDialog("Question bank server", state.bankUrl, onBankUrl, { dialog = null }, label = "https://…", note = "Your own server with answer keys (see the README). Leave empty if you don't have one.")

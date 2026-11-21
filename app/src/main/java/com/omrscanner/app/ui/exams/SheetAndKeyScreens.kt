@@ -237,7 +237,7 @@ fun PaperCard(p: PaperSummary, note: String?, button: String?, onClick: () -> Un
     }
 }
 
-// ── Step 2: the answer sheets ───────────────────────────────
+// ── Step 2: the OMR sheets ──────────────────────────────────
 
 @Composable
 fun PrintScreen(vm: AppViewModel, nav: NavController, id: Long) {
@@ -266,7 +266,7 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
     fun letters(n: Int) = e.copy(options = n).layout().optionLabels().joinToString(" ")
 
     Screen(
-        title = "Answer sheets", subtitle = e.title, onBack = onBack,
+        title = "OMR sheets", subtitle = e.title, onBack = onBack,
         bottom = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryButton("Share", onShare, Modifier.weight(1f), icon = Icons.Outlined.Share)
@@ -277,11 +277,11 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
         item {
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(InsetBg).padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.fillMaxWidth(0.78f).aspectRatio(1000f / 1414f).shadow(3.dp).background(Color.White)) {
-                    preview?.let { Image(it, contentDescription = "How the answer sheet looks", modifier = Modifier.fillMaxSize()) }
+                    preview?.let { Image(it, contentDescription = "How the OMR sheet looks", modifier = Modifier.fillMaxSize()) }
                 }
             }
         }
-        item { Hint("One A4 page for each of the ${plural(b.total, "student")}. Print at actual size (100%), not “fit to page”.") }
+        item { Hint("One A4 OMR sheet for each of the ${plural(b.total, "student")}. Print at actual size (100%), not “fit to page”.") }
         if (locked) item { Banner("Sheets were scanned on this layout, so its questions, choices, roll and set code stay as they are.", Tone.NEUTRAL) }
         item {
             AppCard {

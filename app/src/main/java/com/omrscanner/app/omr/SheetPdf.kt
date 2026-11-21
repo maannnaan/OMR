@@ -68,7 +68,7 @@ object SheetPdf {
             val box = stroke(1.4f, Color.rgb(190, 194, 200))
             c.drawText(if (bn) "নাম" else "Name", 60f, sl.nameTop + 24f, label)
             c.drawRect(150f, sl.nameTop + 4f, 940f, sl.nameTop + 32f, box)
-            c.drawText(if (bn) "শ্রেণী" else "Class", 60f, sl.nameTop + 64f, label)
+            c.drawText(if (bn) "শ্রেণি" else "Class", 60f, sl.nameTop + 64f, label)
             c.drawRect(150f, sl.nameTop + 44f, 940f, sl.nameTop + 72f, box)
         }
 

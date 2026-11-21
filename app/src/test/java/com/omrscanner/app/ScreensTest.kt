@@ -77,7 +77,7 @@ class ScreensTest {
         AnswerKeyContent(physics, "102", key, isDone = { it == "101" }, bankAvailable = false, doneLabel = "Done", onBack = none, onSelect = {}, onAnswer = { _, _ -> }, onAddSet = none, onBank = none, onDone = none)
     }
 
-    @Test fun answerSheets() = shot("5-answer-sheets") {
+    @Test fun omrSheets() = shot("5-omr-sheets") {
         PrintContent(biology, SheetPdf.preview(biology.exam.layout(), 700).asImageBitmap(), none, {}, none, none)
     }
 

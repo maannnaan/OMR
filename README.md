@@ -35,7 +35,7 @@ The app is built to be simple: no tabs, one exam at a time, and one big button a
 2. **New exam** asks only for a name, the number of questions, the number of students and the number of question sets. Or pick **From Lecturer.bd** to bring in a final question paper with its keys and students.
 3. **An exam** is three numbered steps, ticked off as they're done, with the results under them:
    1. **Answer key**: tap the right answer for each question (one key per set; the chips at the top switch sets). Or fill every set from a question bank.
-   2. **Answer sheets**: a picture of the sheet, a few settings (questions, choices, language, roll digits, set code, school name), then **Print** (Android's print dialog, which can also save a PDF) or **Share** (to send to a print shop).
+   2. **OMR sheets**: this is where the sheet is made. A picture of it, a few settings (questions, choices, language, roll digits, set code, name lines, school name), then **Print sheets** (Android's print dialog, which can also save a PDF) or **Share** (to send the PDF to a print shop). There's one A4 sheet per student, and the settings lock once sheets have been scanned, because the scanner reads by them.
    3. **Scan**: hold the phone over a sheet. It finds the four corner squares, reads the sheet by itself when steady (or press the round button), buzzes, shows the student's name and marks, then waits for the next sheet, so a stack goes quickly.
 4. **Results** list every student with their marks. Sheets that need a look come first, with the reason ("Check roll", "Check set", "Same roll"): the sheet screen shows each answer (the right one ringed in green), lets you tap a bubble to fix a misread mark, choose the right student or set, see the photo, or delete the sheet. **Share** sends a CSV; **Question analysis** shows the hardest questions and the spread of marks.
 5. **Exam settings** (the gear on an exam): its name and class, the students' names, what two answers on one question mean (counted wrong as in board exams, or your choice on each sheet), and deleting the exam.
@@ -48,7 +48,13 @@ How a sheet is marked: two firm marks on one question count as wrong by default;
 |---|---|---|---|
 | ![Home](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_home_1-home.png) | ![An exam](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_examWithResults_3-exam.png) | ![Scanning](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_scanRead_6-scan-read.png) | ![Checking a sheet](app/src/test/snapshots/images/com.omrscanner.app_ScreensTest_sheetToCheck_7-sheet-check.png) |
 
-`app/src/test/java/com/omrscanner/app/ScreensTest.kt` draws every screen with sample exams on a 360 × 800 dp phone ([Paparazzi](https://github.com/cashapp/paparazzi), no phone or emulator needed). `gradlew recordPaparazziDebug` writes them to `app/src/test/snapshots/images`; the normal test run draws them too, so a screen that can't be drawn fails the build.
+`app/src/test/java/com/omrscanner/app/ScreensTest.kt` draws every screen with sample exams on a 360 × 800 dp phone ([Paparazzi](https://github.com/cashapp/paparazzi), no phone or emulator needed), and `SheetsTest.kt` draws the OMR sheet itself, exactly as it prints:
+
+| English, 30 questions | Bangla, 50 questions | 100 questions |
+|---|---|---|
+| ![English OMR sheet](app/src/test/snapshots/images/com.omrscanner.app_SheetsTest_english_sheet-english-30.png) | ![Bangla OMR sheet](app/src/test/snapshots/images/com.omrscanner.app_SheetsTest_bangla_sheet-bangla-50.png) | ![100-question OMR sheet](app/src/test/snapshots/images/com.omrscanner.app_SheetsTest_hundred_sheet-english-100.png) |
+
+`gradlew recordPaparazziDebug` writes the pictures to `app/src/test/snapshots/images`; the normal test run draws them too, so a screen that can't be drawn fails the build.
 
 ### Document scanner (Settings → Scan documents)
 - **Scan document** opens Google's ML Kit scanner: live edge detection, auto-capture, crop handles, perspective correction and background removal, on-device.
