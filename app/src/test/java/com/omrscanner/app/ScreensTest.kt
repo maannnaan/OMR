@@ -156,6 +156,7 @@ private object Samples {
         id: Long, title: String, students: Int, sets: List<String>, keyed: Boolean, scanned: Int,
         remote: String? = null, problems: Boolean = false, uploaded: Int = 0, bangla: Boolean = false,
     ): ExamBundle {
+        seed = 11L + id * 7919 // each exam's marks come out the same whichever test runs first
         val setCode = sets.size > 1
         val exam = ExamEntity(
             id = id, title = title, className = "Class 10", date = "", questions = 30, options = 4,
