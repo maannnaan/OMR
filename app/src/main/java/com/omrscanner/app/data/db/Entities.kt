@@ -26,7 +26,20 @@ data class ExamEntity(
     val createdAt: Long = System.currentTimeMillis(),
     /** The Lecturer.bd question paper this exam was imported from; its results upload there. Null for exams made here. */
     val remotePaperId: String? = null,
-)
+) {
+    companion object {
+        /**
+         * An exam made in the app, as New exam describes it: [questions] of [options] choices lettered
+         * [labels] ("ABC", "BANGLA" or "123"; বাংলা letters print the sheet in Bangla), rolls 1…[students],
+         * and a set-code grid when there's more than one set.
+         */
+        fun draft(title: String, questions: Int, options: Int, labels: String, students: Int, sets: Int, school: String, date: String = "") = ExamEntity(
+            title = title, className = "", date = date, questions = questions, options = options,
+            labels = labels, language = if (labels == "BANGLA") "Bangla" else "English",
+            rollDigits = maxOf(3, students.toString().length), setCode = sets > 1, institution = school,
+        )
+    }
+}
 
 @Entity(tableName = "students", indices = [Index("examId")])
 data class StudentEntity(

@@ -23,6 +23,18 @@ class SheetLayout(val layout: Layout) {
         /** Small square beside the top-left marker — tells the reader which way is up. */
         val orientationMark = RectF(86f, 30f, 102f, 46f)
         const val CONTENT_BOTTOM = 1300f
+
+        /**
+         * The smallest bubble radius a sheet may have: 8 units, about 3.4 mm across on A4. More questions,
+         * more choices or a longer roll squeeze the bubbles; below this they're hard to fill and to read.
+         */
+        const val MIN_BUBBLE = 8f
+
+        /** Whether this sheet's bubbles come out big enough to fill and scan. */
+        fun fits(layout: Layout) = SheetLayout(layout).bubbleR >= MIN_BUBBLE
+
+        /** The most questions, up to [Layout.questions], that fit on the sheet with its other settings. */
+        fun maxQuestions(layout: Layout) = (layout.questions downTo 1).firstOrNull { fits(layout.copy(questions = it)) } ?: 0
     }
 
     data class Panel(val title: String, val x: Float, val cols: Int)

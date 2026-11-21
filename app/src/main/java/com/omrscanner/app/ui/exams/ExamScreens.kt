@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,10 @@ import androidx.navigation.NavController
 import com.omrscanner.app.data.ExamBundle
 import com.omrscanner.app.data.db.ExamEntity
 import com.omrscanner.app.data.db.SheetEntity
+import com.omrscanner.app.omr.Layout
+import com.omrscanner.app.omr.SheetLayout
+import com.omrscanner.app.omr.labelsFor
+import com.omrscanner.app.omr.layout
 import com.omrscanner.app.ui.AppViewModel
 import com.omrscanner.app.ui.Routes
 import com.omrscanner.app.ui.components.AppCard
@@ -160,26 +165,44 @@ private fun ExamCard(b: ExamBundle, onClick: () -> Unit) {
 fun NewExamScreen(vm: AppViewModel, nav: NavController) {
     NewExamContent(
         signedIn = vm.settings.lecturerSignedIn,
+        school = vm.settings.schoolName,
         onBack = { nav.popBackStack() },
         onLecturer = { nav.navigate(if (vm.settings.lecturerSignedIn) Routes.LECTURER_PAPERS else Routes.SETTINGS) },
-        onCreate = { title, questions, students, sets ->
-            vm.createExam(title, questions, students, sets) { id -> nav.popBackStack(); nav.navigate(Routes.exam(id)) }
+        onCreate = { title, questions, options, labels, students, sets ->
+            vm.createExam(title, questions, options, labels, students, sets) { id -> nav.popBackStack(); nav.navigate(Routes.exam(id)) }
         },
     )
 }
 
+/**
+ * A new exam, and with it its OMR sheet: how many questions, how many choices each and their letters,
+ * how many students and sets. The sheet's picture follows every choice. [preview] draws it (in the
+ * background in the app; at once in the screen-picture tests).
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NewExamContent(signedIn: Boolean, onBack: () -> Unit, onLecturer: () -> Unit, onCreate: (title: String, questions: Int, students: Int, sets: Int) -> Unit) {
+fun NewExamContent(
+    signedIn: Boolean, school: String, onBack: () -> Unit, onLecturer: () -> Unit,
+    onCreate: (title: String, questions: Int, options: Int, labels: String, students: Int, sets: Int) -> Unit,
+    preview: @Composable (Layout) -> ImageBitmap? = { rememberSheetPreview(it, 700) },
+) {
     var title by rememberSaveable { mutableStateOf("") }
     var questions by rememberSaveable { mutableStateOf("30") }
+    var options by rememberSaveable { mutableIntStateOf(4) }
+    var letters by rememberSaveable { mutableStateOf("ABC") }
     var students by rememberSaveable { mutableStateOf("30") }
     var sets by rememberSaveable { mutableIntStateOf(1) }
     var tried by rememberSaveable { mutableStateOf(false) }
     val q = questions.toIntOrNull()
     val s = students.toIntOrNull()
+    // the sheet these choices make (with a stand-in number while one is being typed)
+    val layout = ExamEntity.draft(title.trim(), (q ?: 30).coerceIn(1, 100), options, letters, (s ?: 30).coerceIn(1, 999), sets, school).layout()
     val titleError = if (tried && title.isBlank()) "Give the exam a name" else null
-    val qError = if (q == null || q !in 1..100) "From 1 to 100" else null
+    val qError = when {
+        q == null || q !in 1..100 -> "From 1 to 100"
+        !SheetLayout.fits(layout) -> "At most ${SheetLayout.maxQuestions(layout)} fit on one sheet with ${plural(options, "choice")} each"
+        else -> null
+    }
     val sError = if (s == null || s !in 1..999) "From 1 to 999" else null
 
     Screen(
@@ -187,7 +210,7 @@ fun NewExamContent(signedIn: Boolean, onBack: () -> Unit, onLecturer: () -> Unit
         bottom = {
             PrimaryButton("Create exam", {
                 tried = true
-                if (title.isNotBlank() && qError == null && sError == null) onCreate(title.trim(), q!!, s!!, sets)
+                if (title.isNotBlank() && qError == null && sError == null) onCreate(title.trim(), q!!, options, letters, s!!, sets)
             })
         },
     ) {
@@ -211,9 +234,21 @@ fun NewExamContent(signedIn: Boolean, onBack: () -> Unit, onLecturer: () -> Unit
         item { SectionTitle("Or make one here") }
         item { Field(title, { title = it }, "Exam name", error = titleError) }
         item {
-            Field(questions, { questions = it }, "Number of questions", number = true, error = if (tried || questions.isNotEmpty()) qError else null)
+            Field(questions, { questions = it }, "Number of questions (MCQ)", number = true, error = if (tried || questions.isNotEmpty()) qError else null)
             FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(20, 25, 30, 50, 100).forEach { v -> Chip("$v", q == v, { questions = "$v" }) }
+            }
+        }
+        item {
+            FormLabel("Choices per question")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (2..6).forEach { v -> Chip("$v", options == v, { options = v }, Modifier.weight(1f)) }
+            }
+        }
+        item {
+            FormLabel("Letters in the bubbles", "বাংলা letters print the whole sheet in Bangla.")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("ABC", "BANGLA", "123").forEach { l -> Chip(labelsFor(l, options).joinToString(" "), letters == l, { letters = l }) }
             }
         }
         item {
@@ -224,13 +259,22 @@ fun NewExamContent(signedIn: Boolean, onBack: () -> Unit, onLecturer: () -> Unit
             )
         }
         item {
-            Text("Question sets", fontSize = 16.sp, color = Ink, modifier = Modifier.padding(start = 4.dp))
-            Hint("Different versions of the paper, each with its own answer key.", Modifier.padding(top = 2.dp, bottom = 8.dp))
+            FormLabel("Question sets", "Different versions of the paper, each with its own answer key.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (1..4).forEach { v -> Chip("$v", sets == v, { sets = v }, Modifier.weight(1f)) }
             }
         }
+        item { SectionTitle("Your OMR sheet") }
+        item { SheetPicture(preview(layout), widthFraction = 0.7f) }
+        item { Hint("You can still change it before printing, in the exam's OMR sheets step.") }
     }
+}
+
+/** A heading over a row of choices, with an optional line under it. */
+@Composable
+private fun FormLabel(text: String, hint: String? = null) {
+    Text(text, fontSize = 16.sp, color = Ink, modifier = Modifier.padding(start = 4.dp, bottom = if (hint == null) 8.dp else 0.dp))
+    if (hint != null) Hint(hint, Modifier.padding(top = 2.dp, bottom = 8.dp))
 }
 
 // ── One exam: three steps, then its results ─────────────────

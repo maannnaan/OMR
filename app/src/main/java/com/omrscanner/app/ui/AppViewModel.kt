@@ -55,14 +55,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ── exams ───────────────────────────────────────────────
     /**
      * A new exam made here: students numbered 1, 2, 3… and one answer key per set (set codes 101, 102…;
-     * one set needs no set-code grid on the sheet). The sheet's look can change before printing.
+     * one set needs no set-code grid on the sheet). The sheet's look can still change before printing.
      */
-    fun createExam(title: String, questions: Int, students: Int, sets: Int, onCreated: (Long) -> Unit) = io {
-        val exam = ExamEntity(
-            title = title, className = "", date = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date()),
-            questions = questions, options = 4, rollDigits = maxOf(3, students.toString().length), setCode = sets > 1,
-            institution = settings.schoolName,
-        )
+    fun createExam(title: String, questions: Int, options: Int, labels: String, students: Int, sets: Int, onCreated: (Long) -> Unit) = io {
+        val date = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date())
+        val exam = ExamEntity.draft(title, questions, options, labels, students, sets, settings.schoolName, date)
         val id = c.exams.create(exam, List(students) { "Student ${it + 1}" }, List(sets) { (101 + it).toString() })
         onCreated(id)
     }

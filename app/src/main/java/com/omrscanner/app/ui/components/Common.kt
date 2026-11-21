@@ -408,5 +408,16 @@ fun ConfirmDialog(title: String, body: String, confirm: String, onConfirm: () ->
     )
 }
 
+/** A message to read, with just OK. */
+@Composable
+fun InfoDialog(title: String, body: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(body, fontSize = 15.sp) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = Brand, fontWeight = FontWeight.SemiBold) } },
+    )
+}
+
 /** "1 sheet", "3 sheets". */
 fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"

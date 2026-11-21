@@ -48,7 +48,10 @@ import com.omrscanner.app.data.ExamBundle
 import com.omrscanner.app.data.bank.PaperSummary
 import com.omrscanner.app.data.db.ExamEntity
 import com.omrscanner.app.omr.KeyCodec
+import com.omrscanner.app.omr.Layout
+import com.omrscanner.app.omr.SheetLayout
 import com.omrscanner.app.omr.SheetPdf
+import com.omrscanner.app.omr.labelsFor
 import com.omrscanner.app.omr.layout
 import com.omrscanner.app.ui.AppViewModel
 import com.omrscanner.app.ui.Routes
@@ -60,6 +63,7 @@ import com.omrscanner.app.ui.components.Chip
 import com.omrscanner.app.ui.components.ConfirmDialog
 import com.omrscanner.app.ui.components.Field
 import com.omrscanner.app.ui.components.Hint
+import com.omrscanner.app.ui.components.InfoDialog
 import com.omrscanner.app.ui.components.Pill
 import com.omrscanner.app.ui.components.PrimaryButton
 import com.omrscanner.app.ui.components.RowDivider
@@ -239,15 +243,31 @@ fun PaperCard(p: PaperSummary, note: String?, button: String?, onClick: () -> Un
 
 // ── Step 2: the OMR sheets ──────────────────────────────────
 
+/** The OMR sheet as it prints, drawn in the background whenever its layout changes. */
+@Composable
+fun rememberSheetPreview(layout: Layout, widthPx: Int = 900): ImageBitmap? {
+    val image by produceState<ImageBitmap?>(null, layout) {
+        value = withContext(Dispatchers.Default) { SheetPdf.preview(layout, widthPx).asImageBitmap() }
+    }
+    return image
+}
+
+/** A page of A4 on a grey tray, with the sheet on it once it's drawn. */
+@Composable
+fun SheetPicture(image: ImageBitmap?, widthFraction: Float = 0.78f) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(InsetBg).padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth(widthFraction).aspectRatio(1000f / 1414f).shadow(3.dp).background(Color.White)) {
+            image?.let { Image(it, contentDescription = "How the OMR sheet looks", modifier = Modifier.fillMaxSize()) }
+        }
+    }
+}
+
 @Composable
 fun PrintScreen(vm: AppViewModel, nav: NavController, id: Long) {
     val b = rememberBundle(vm, id) ?: return
     val ctx = LocalContext.current
-    val preview by produceState<ImageBitmap?>(null, b.exam) {
-        value = withContext(Dispatchers.Default) { SheetPdf.preview(b.exam.layout(), 900).asImageBitmap() }
-    }
     PrintContent(
-        b, preview,
+        b, rememberSheetPreview(b.exam.layout()),
         onBack = { nav.popBackStack() },
         onChange = { vm.updateExam(it) },
         onPrint = { vm.printSheets(ctx, b) },
@@ -262,8 +282,10 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
     var dialog by remember { mutableStateOf<String?>(null) }
     val e = b.exam
     val locked = b.sheets.isNotEmpty()
+    // a Lecturer.bd paper decides how many questions there are, each with its 4 choices
+    val byPaper = b.fromLecturer
     val labels = e.layout().optionLabels()
-    fun letters(n: Int) = e.copy(options = n).layout().optionLabels().joinToString(" ")
+    fun fits(x: ExamEntity) = SheetLayout.fits(x.layout())
 
     Screen(
         title = "OMR sheets", subtitle = e.title, onBack = onBack,
@@ -274,20 +296,15 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
             }
         },
     ) {
-        item {
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(InsetBg).padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.fillMaxWidth(0.78f).aspectRatio(1000f / 1414f).shadow(3.dp).background(Color.White)) {
-                    preview?.let { Image(it, contentDescription = "How the OMR sheet looks", modifier = Modifier.fillMaxSize()) }
-                }
-            }
-        }
+        item { SheetPicture(preview) }
         item { Hint("One A4 OMR sheet for each of the ${plural(b.total, "student")}. Print at actual size (100%), not “fit to page”.") }
         if (locked) item { Banner("Sheets were scanned on this layout, so its questions, choices, roll and set code stay as they are.", Tone.NEUTRAL) }
+        if (!fits(e)) item { Banner("The bubbles on this sheet come out small. Fewer questions or a shorter roll number would make them easier to fill and to scan.") }
         item {
             AppCard {
-                SettingRow("Questions", "${e.questions}", if (locked) null else { { dialog = "questions" } }, locked = locked)
+                SettingRow("Questions", "${e.questions}", if (locked || byPaper) null else { { dialog = "questions" } }, locked = locked || byPaper)
                 RowDivider()
-                SettingRow("Choices per question", "${e.options} · ${labels.joinToString(" ")}", if (locked) null else { { dialog = "options" } }, locked = locked)
+                SettingRow("Choices per question", "${e.options} · ${labels.joinToString(" ")}", if (locked || byPaper) null else { { dialog = "options" } }, locked = locked || byPaper)
                 RowDivider()
                 SettingRow("Language", (if (e.language == "Bangla") "বাংলা" else "English") + " · " + labels.joinToString(" "), { dialog = "language" })
                 RowDivider()
@@ -295,7 +312,13 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
                 RowDivider()
                 SwitchRow(
                     "Set code", if (e.setCode) "A 3-digit set code on each sheet" else "Off: everyone has the same paper", e.setCode,
-                    { on -> if (!on && b.keyRows.count { it.answers.split(",").any { a -> a.trim() != "-1" } } > 1) dialog = "setcode" else onChange(e.copy(setCode = on)) },
+                    { on ->
+                        when {
+                            on && !fits(e.copy(setCode = true)) -> dialog = "setcode-room"
+                            !on && b.keyRows.count { it.answers.split(",").any { a -> a.trim() != "-1" } } > 1 -> dialog = "setcode"
+                            else -> onChange(e.copy(setCode = on))
+                        }
+                    },
                     enabled = !locked,
                 )
                 RowDivider()
@@ -304,14 +327,29 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
                 SettingRow("School name", e.institution.ifBlank { "Not set" }, { dialog = "school" })
             }
         }
+        if (byPaper && !locked) item { Hint("The number of questions and choices come from the question paper on Lecturer.bd.") }
     }
 
     when (dialog) {
         "questions" -> TextDialog(
             "Questions", "${e.questions}", { onChange(e.copy(questions = it.toInt())) }, { dialog = null },
-            label = "Number of questions", number = true, check = { if ((it.toIntOrNull() ?: 0) !in 1..100) "From 1 to 100" else null },
+            label = "Number of questions", number = true,
+            check = {
+                val n = it.toIntOrNull() ?: 0
+                when {
+                    n !in 1..100 -> "From 1 to 100"
+                    !fits(e.copy(questions = n)) -> "At most ${SheetLayout.maxQuestions(e.copy(questions = n).layout())} fit on one sheet with ${plural(e.options, "choice")} each"
+                    else -> null
+                }
+            },
         )
-        "options" -> ChoiceDialog("Choices per question", (2..6).map { it to "$it · ${letters(it)}" }, e.options, { onChange(e.copy(options = it)) }, { dialog = null })
+        "options" -> {
+            val room = (2..6).filter { fits(e.copy(options = it)) }
+            ChoiceDialog(
+                "Choices per question", room.map { it to "$it · ${labelsFor(e.labels, it).joinToString(" ")}" }, e.options, { onChange(e.copy(options = it)) }, { dialog = null },
+                note = if (room.size < 5) "More choices don't fit on one sheet with ${plural(e.questions, "question")}." else null,
+            )
+        }
         "language" -> ChoiceDialog(
             "Language",
             listOf("en" to "English · A B C D", "bn" to "বাংলা · ক খ গ ঘ", "num" to "English · 1 2 3 4"),
@@ -329,16 +367,22 @@ fun PrintContent(b: ExamBundle, preview: ImageBitmap?, onBack: () -> Unit, onCha
         )
         "roll" -> {
             val min = maxOf(1, b.total.toString().length, b.students.maxOfOrNull { it.roll.trimStart('0').length } ?: 1)
+            val room = (min..8).filter { fits(e.copy(rollDigits = it)) }
             ChoiceDialog(
                 "Roll number",
-                listOf(0 to "None (I'll match names myself)") + (min..8).map { it to "${plural(it, "digit")} · rolls up to ${"9".repeat(it)}" },
+                listOf(0 to "None (I'll match names myself)") + room.map { it to "${plural(it, "digit")} · rolls up to ${"9".repeat(it)}" },
                 e.rollDigits, { onChange(e.copy(rollDigits = it)) }, { dialog = null },
+                note = if (min <= 8 && room.size < 9 - min) "Longer rolls don't fit on one sheet with ${plural(e.questions, "question")}." else null,
             )
         }
         "setcode" -> ConfirmDialog(
             "Turn off set codes?", "Set ${b.sets.firstOrNull() ?: "101"}'s answers stay as the answer key; the other sets' answers are removed.",
             "Turn off", { onChange(e.copy(setCode = false)) }, { dialog = null },
         )
+        "setcode-room" -> InfoDialog(
+            "No room for a set code",
+            "With ${plural(e.questions, "question")} of ${plural(e.options, "choice")} each, the set-code boxes would make the bubbles too small. Use fewer questions or choices first.",
+        ) { dialog = null }
         "school" -> TextDialog("School name", e.institution, { onChange(e.copy(institution = it)) }, { dialog = null }, note = "Printed at the top of the sheet.")
     }
 }

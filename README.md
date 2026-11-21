@@ -32,7 +32,9 @@ From the command line:
 The app is built to be simple: no tabs, one exam at a time, and one big button at the bottom of each screen for the thing to do next.
 
 1. **Home** lists the exams. Each card says in a few words how the exam stands ("Add the answer key", "3 sheets to check", "28 scanned · average 72%"). **New exam** is at the bottom; Settings is the gear.
-2. **New exam** asks only for a name, the number of questions, the number of students and the number of question sets. Or pick **From Lecturer.bd** to bring in a final question paper with its keys and students.
+2. **New exam** makes the exam and its OMR sheet together: a name, the number of questions (MCQ, up to 100), the choices per question (2 to 6) and their letters (A B C D, ক খ গ ঘ or 1 2 3 4; Bangla letters print the whole sheet in Bangla), the number of students and of question sets. A picture of the sheet follows every choice. Or pick **From Lecturer.bd** to bring in a final question paper with its keys and students; its questions and choices (4 each) are then the paper's.
+
+   More questions, more choices or a longer roll number make the bubbles smaller. A sheet is refused only when they'd get too small to fill and scan well (under about 3.4 mm), and the app says how many questions do fit: for example 100 questions of 6 choices need the set code off, or at most 82 with it.
 3. **An exam** is three numbered steps, ticked off as they're done, with the results under them:
    1. **Answer key**: tap the right answer for each question (one key per set; the chips at the top switch sets). Or fill every set from a question bank.
    2. **OMR sheets**: this is where the sheet is made. A picture of it, a few settings (questions, choices, language, roll digits, set code, name lines, school name), then **Print sheets** (Android's print dialog, which can also save a PDF) or **Share** (to send the PDF to a print shop). There's one A4 sheet per student, and the settings lock once sheets have been scanned, because the scanner reads by them.

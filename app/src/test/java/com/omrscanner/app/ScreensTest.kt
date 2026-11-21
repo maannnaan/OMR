@@ -45,9 +45,11 @@ import org.junit.Test
  * pictures to app/src/test/snapshots/images; a plain test run puts them under app/build/reports/paparazzi.
  */
 class ScreensTest {
+    private val phone = DeviceConfig.PIXEL_5.copy(screenWidth = 1080, screenHeight = 2400, xdpi = 480, ydpi = 480, density = Density.XXHIGH, softButtons = false)
+
     @get:Rule
     val paparazzi = Paparazzi(
-        deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 1080, screenHeight = 2400, xdpi = 480, ydpi = 480, density = Density.XXHIGH, softButtons = false),
+        deviceConfig = phone,
         theme = "android:Theme.Material.Light.NoActionBar",
         maxPercentDifference = 0.5,
     )
@@ -64,7 +66,19 @@ class ScreensTest {
 
     @Test fun homeEmpty() = shot("1-home-empty") { ExamsContent(emptyList(), {}, none, none) }
 
-    @Test fun newExam() = shot("2-new-exam") { NewExamContent(signedIn = true, onBack = none, onLecturer = none, onCreate = { _, _, _, _ -> }) }
+    @Composable
+    private fun NewExam() = NewExamContent(
+        signedIn = true, school = "Dhaka Ideal School", onBack = none, onLecturer = none, onCreate = { _, _, _, _, _, _ -> },
+        preview = { SheetPdf.preview(it, 500).asImageBitmap() },
+    )
+
+    @Test fun newExam() = shot("2-new-exam") { NewExam() }
+
+    /** The whole form on one tall picture, down to the sheet it makes. */
+    @Test fun newExamWhole() {
+        paparazzi.unsafeUpdateConfig(deviceConfig = phone.copy(screenHeight = 4800))
+        shot("2-new-exam-whole") { NewExam() }
+    }
 
     @Test fun examWithResults() = shot("3-exam") { ExamContent(physics, true, false, none, none, none, none, none, {}, none, none, none, none) }
 

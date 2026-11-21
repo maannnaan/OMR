@@ -16,12 +16,15 @@ data class Layout(
 ) {
     val bangla get() = language == "Bangla"
 
-    fun optionLabels(): List<String> = when (labels) {
-        "BANGLA" -> listOf("ক", "খ", "গ", "ঘ", "ঙ", "চ")
-        "123" -> listOf("1", "2", "3", "4", "5", "6")
-        else -> listOf("A", "B", "C", "D", "E", "F")
-    }.take(options)
+    fun optionLabels(): List<String> = labelsFor(labels, options)
 }
+
+/** The letters in the bubbles, as many as there are choices: A B C…, ক খ গ… ("BANGLA") or 1 2 3… ("123"). */
+fun labelsFor(labels: String, options: Int): List<String> = when (labels) {
+    "BANGLA" -> listOf("ক", "খ", "গ", "ঘ", "ঙ", "চ")
+    "123" -> listOf("1", "2", "3", "4", "5", "6")
+    else -> listOf("A", "B", "C", "D", "E", "F")
+}.take(options)
 
 fun ExamEntity.layout() = Layout(questions, options, labels, language, rollDigits, setCode, nameFields, institution, title)
 
